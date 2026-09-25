@@ -35,6 +35,7 @@ export default function Dashboard({
 
   // 60fps Ultra-smooth countdown timer via requestAnimationFrame & direct DOM ref
   const progressBarRef = useRef(null);
+  const isAutoPingingRef = useRef(false);
   const [countdownText, setCountdownText] = useState('--:--');
 
   useEffect(() => {
@@ -64,9 +65,20 @@ export default function Dashboard({
       const diffMs = nextPingTime - now;
 
       if (diffMs <= 0) {
-        setCountdownText('00:00');
+        setCountdownText('Pinging...');
         if (progressBarRef.current) progressBarRef.current.style.width = '0%';
+
+        // Auto-trigger keep-alive ping when countdown reaches 00:00!
+        if (!isAutoPingingRef.current && onTriggerPing && !isPinging) {
+          isAutoPingingRef.current = true;
+          onTriggerPing().finally(() => {
+            setTimeout(() => {
+              isAutoPingingRef.current = false;
+            }, 2000);
+          });
+        }
       } else {
+        isAutoPingingRef.current = false;
         const remainingSec = Math.floor(diffMs / 1000);
         if (remainingSec !== lastLoggedSec) {
           lastLoggedSec = remainingSec;
@@ -87,7 +99,7 @@ export default function Dashboard({
 
     animId = requestAnimationFrame(renderFrame);
     return () => cancelAnimationFrame(animId);
-  }, [stats.lastPingFull, automation.enabled, automation.interval]);
+  }, [stats.lastPingFull, automation.enabled, automation.interval, onTriggerPing, isPinging]);
 
   return (
     <div className="space-y-6">

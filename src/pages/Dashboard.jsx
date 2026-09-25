@@ -177,31 +177,78 @@ export default function Dashboard({
             </p>
           </div>
 
-          {/* Quick cluster details header pill */}
-          <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-            <div className="px-3 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 text-gray-300">
-              <span className="text-gray-500 mr-1.5">Cluster:</span>
-              <span className="text-white font-semibold">Production Database</span>
+          {/* Active Engines / Target Summary Card */}
+          <div className="bg-gray-950/70 border border-gray-800/80 rounded-2xl p-3 sm:p-3.5 backdrop-blur-md shadow-lg shadow-black/20 flex flex-col gap-2.5 min-w-[300px] lg:min-w-[350px]">
+            <div className="flex items-center justify-between text-xs pb-1.5 border-b border-gray-800/70">
+              <span className="flex items-center gap-1.5 font-semibold text-gray-300 tracking-wide text-[11px] uppercase">
+                <Database className="w-3.5 h-3.5 text-mongo" />
+                Target Engines
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                {configuredDatabasesList.length} Connected
+              </span>
             </div>
-            <div className="px-3 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 text-gray-300">
-              <span className="text-gray-500 mr-1.5">🍃 Mongo:</span>
-              <span className="text-mongo font-semibold">{dbInfo.name || 'system_reset'}</span>
+
+            {/* Grid of database targets */}
+            <div className={`grid gap-2 ${configuredDatabasesList.length > 2 ? 'grid-cols-3' : configuredDatabasesList.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              {/* MongoDB */}
+              <div className="bg-gray-900/90 border border-gray-800/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center hover:border-mongo/40 transition-colors">
+                <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium">
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-mongo shadow-[0_0_6px_rgba(0,237,100,0.6)]" />
+                    Mongo
+                  </span>
+                  <span className="text-[9px] font-mono text-gray-500">Atlas</span>
+                </div>
+                <div className="text-xs font-mono font-semibold text-mongo truncate mt-0.5" title={dbInfo.name || 'system_reset'}>
+                  {dbInfo.name || 'system_reset'}
+                </div>
+              </div>
+
+              {/* PostgreSQL */}
+              {dbInfo.postgres?.configured && (
+                <div className="bg-gray-900/90 border border-gray-800/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center hover:border-sky-500/40 transition-colors">
+                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium">
+                    <span className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]" />
+                      Postgres
+                    </span>
+                    <span className="text-[9px] font-mono text-gray-500">Aiven</span>
+                  </div>
+                  <div className="text-xs font-mono font-semibold text-sky-400 truncate mt-0.5" title={dbInfo.postgres.name || 'defaultdb'}>
+                    {dbInfo.postgres.name || 'defaultdb'}
+                  </div>
+                </div>
+              )}
+
+              {/* MySQL */}
+              {dbInfo.mysql?.configured && (
+                <div className="bg-gray-900/90 border border-gray-800/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center hover:border-amber-400/40 transition-colors">
+                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium">
+                    <span className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]" />
+                      MySQL
+                    </span>
+                    <span className="text-[9px] font-mono text-gray-500">Aiven</span>
+                  </div>
+                  <div className="text-xs font-mono font-semibold text-amber-400 truncate mt-0.5" title={dbInfo.mysql.name || 'defaultdb'}>
+                    {dbInfo.mysql.name || 'defaultdb'}
+                  </div>
+                </div>
+              )}
             </div>
-            {dbInfo.postgres?.configured && (
-              <div className="px-3 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 text-gray-300">
-                <span className="text-gray-500 mr-1.5">🐘 Postgres:</span>
-                <span className="text-sky-400 font-semibold">{dbInfo.postgres.name || 'defaultdb'}</span>
-              </div>
-            )}
-            {dbInfo.mysql?.configured && (
-              <div className="px-3 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 text-gray-300">
-                <span className="text-gray-500 mr-1.5">🐬 MySQL:</span>
-                <span className="text-amber-400 font-semibold">{dbInfo.mysql.name || 'mysql'}</span>
-              </div>
-            )}
-            <div className="px-3 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 text-gray-300">
-              <span className="text-gray-500 mr-1.5">Collection:</span>
-              <span className="text-white font-semibold">{dbInfo.collection || 'sysreset'}</span>
+
+            {/* Bottom metadata row */}
+            <div className="flex items-center justify-between text-[11px] font-mono text-gray-500 pt-0.5">
+              <span className="flex items-center gap-1.5">
+                <span className="text-gray-500">Cluster:</span>
+                <span className="text-gray-300 font-sans font-medium">Production Database</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-gray-500">Target Coll:</span>
+                <span className="text-gray-300 font-medium">{dbInfo.collection || 'sysreset'}</span>
+              </span>
             </div>
           </div>
         </div>
@@ -349,16 +396,20 @@ export default function Dashboard({
 
             <div className="space-y-2.5 font-mono text-xs">
               <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
-                <span className="text-gray-400 font-sans flex items-center gap-1.5">
-                  <span>🍃</span> MongoDB
+                <span className="text-gray-300 font-sans flex items-center gap-2 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-mongo shadow-[0_0_6px_rgba(0,237,100,0.6)]" />
+                  MongoDB
+                  <span className="text-[10px] font-mono text-gray-500 bg-gray-800/80 px-1.5 py-0.5 rounded">Atlas</span>
                 </span>
                 <span className="font-bold text-mongo truncate">{dbInfo.name || 'system_reset'}</span>
               </div>
 
               {dbInfo.postgres?.configured && (
                 <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
-                  <span className="text-gray-400 font-sans flex items-center gap-1.5">
-                    <span>🐘</span> PostgreSQL
+                  <span className="text-gray-300 font-sans flex items-center gap-2 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]" />
+                    PostgreSQL
+                    <span className="text-[10px] font-mono text-gray-500 bg-gray-800/80 px-1.5 py-0.5 rounded">Aiven</span>
                   </span>
                   <span className="font-bold text-sky-400 truncate">{dbInfo.postgres.name || 'defaultdb'}</span>
                 </div>
@@ -366,8 +417,10 @@ export default function Dashboard({
 
               {dbInfo.mysql?.configured && (
                 <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
-                  <span className="text-gray-400 font-sans flex items-center gap-1.5">
-                    <span>🐬</span> MySQL
+                  <span className="text-gray-300 font-sans flex items-center gap-2 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]" />
+                    MySQL
+                    <span className="text-[10px] font-mono text-gray-500 bg-gray-800/80 px-1.5 py-0.5 rounded">Aiven</span>
                   </span>
                   <span className="font-bold text-amber-400 truncate">{dbInfo.mysql.name || 'mysql'}</span>
                 </div>

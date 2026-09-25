@@ -1,4 +1,5 @@
-const { connectToDatabase } = require('./lib/mongodb');
+﻿const { connectToDatabase } = require('./lib/mongodb');
+const { isPostgresConfigured, pingPostgres } = require('./lib/postgres');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 const { notifyPingSuccess } = require('./lib/telegramNotifier');
 
@@ -37,66 +38,133 @@ exports.handler = async (event, context) => {
     });
   }
 
-  const dbName = process.env.MONGO_DB_NAME || 'system_reset';
-  const startTime = Date.now();
+  const mongoDbName = process.env.MONGO_DB_NAME || 'system_reset';
+  const pingResults = [];
 
   try {
     const { db } = await connectToDatabase();
-
-    const pingStart = Date.now();
-    const pingResult = await db.command({ ping: 1 });
-    const responseTimeMs = Date.now() - pingStart;
-
-    const logEntry = {
-      action: 'PING',
-      status: 'SUCCESS',
-      responseTime: responseTimeMs,
-      createdAt: new Date(),
-    };
-
-    // Save log entry to MongoDB logs collection
     const logsCol = db.collection('logs');
-    await logsCol.insertOne(logEntry);
 
-    // Broadcast keep-alive success notification to approved Telegram subscribers
+    // 1. Ping MongoDB
+    const mongoStart = Date.now();
+    try {
+      const pingResult = await db.command({ ping: 1 });
+      const mongoLatency = Date.now() - mongoStart;
+
+      await logsCol.insertOne({
+        action: 'PING',
+        target: 'MongoDB',
+        status: 'SUCCESS',
+        database: mongoDbName,
+        responseTime: mongoLatency,
+        source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
+        createdAt: new Date(),
+      });
+
+      pingResults.push({
+        target: 'MongoDB',
+        status: 'SUCCESS',
+        database: mongoDbName,
+        responseTime: mongoLatency,
+        pingResult,
+      });
+    } catch (mongoErr) {
+      const mongoLatency = Date.now() - mongoStart;
+      console.error('MongoDB Ping operation failed:', mongoErr);
+
+      await logsCol.insertOne({
+        action: 'PING',
+        target: 'MongoDB',
+        status: 'FAILED',
+        database: mongoDbName,
+        responseTime: mongoLatency,
+        error: mongoErr.message || 'Database ping error',
+        source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
+        createdAt: new Date(),
+      });
+
+      pingResults.push({
+        target: 'MongoDB',
+        status: 'FAILED',
+        database: mongoDbName,
+        responseTime: mongoLatency,
+        error: mongoErr.message,
+      });
+    }
+
+    // 2. Ping PostgreSQL (if configured)
+    if (isPostgresConfigured()) {
+      const pgStart = Date.now();
+      try {
+        const pgRes = await pingPostgres();
+        await logsCol.insertOne({
+          action: 'PING',
+          target: 'PostgreSQL',
+          status: 'SUCCESS',
+          database: pgRes.database,
+          responseTime: pgRes.responseTime,
+          source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
+          createdAt: new Date(),
+        });
+
+        pingResults.push({
+          target: 'PostgreSQL',
+          status: 'SUCCESS',
+          database: pgRes.database,
+          responseTime: pgRes.responseTime,
+        });
+      } catch (pgErr) {
+        const pgLatency = Date.now() - pgStart;
+        console.error('PostgreSQL Ping operation failed:', pgErr);
+
+        await logsCol.insertOne({
+          action: 'PING',
+          target: 'PostgreSQL',
+          status: 'FAILED',
+          database: process.env.postgresql_db || 'postgresql',
+          responseTime: pgLatency,
+          error: pgErr.message || 'PostgreSQL ping error',
+          source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
+          createdAt: new Date(),
+        });
+
+        pingResults.push({
+          target: 'PostgreSQL',
+          status: 'FAILED',
+          database: process.env.postgresql_db || 'postgresql',
+          responseTime: pgLatency,
+          error: pgErr.message,
+        });
+      }
+    }
+
+    // 3. Broadcast keep-alive notification to approved Telegram subscribers
     notifyPingSuccess({
-      latencyMs: responseTimeMs,
-      dbName,
+      results: pingResults,
       source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
     }).catch((e) => console.error('Auto notification error:', e.message));
 
     const nowIso = new Date().toISOString();
+    const anyFailed = pingResults.some((r) => r.status === 'FAILED');
 
-    return jsonResponse(200, {
-      status: 'success',
-      database: dbName,
-      responseTime: `${responseTimeMs}ms`,
+    // Construct primary response time summary string
+    const responseTimeSummary = pingResults
+      .map((r) => `${r.target}: ${r.responseTime}ms`)
+      .join(' | ');
+
+    return jsonResponse(anyFailed ? 207 : 200, {
+      status: anyFailed ? 'partial' : 'success',
+      database: mongoDbName,
+      responseTime: responseTimeSummary,
+      results: pingResults,
       timestamp: nowIso.split('T')[0],
       fullTimestamp: nowIso,
-      pingResult,
     });
   } catch (error) {
-    const responseTimeMs = Date.now() - startTime;
-    console.error('Ping operation failed:', error);
-
-    try {
-      const { db } = await connectToDatabase();
-      const logsCol = db.collection('logs');
-      await logsCol.insertOne({
-        action: 'PING',
-        status: 'FAILED',
-        responseTime: responseTimeMs,
-        error: error.message || 'Database ping error',
-        createdAt: new Date(),
-      });
-    } catch (logErr) {
-      console.error('Failed to log ping error:', logErr);
-    }
-
+    console.error('Overall ping handler failed:', error);
     return jsonResponse(500, {
       status: 'error',
-      database: dbName,
-      responseTime: `${responseTimeMs}ms`,
+      database: mongoDbName,
       error: error.message,
       timestamp: new Date().toISOString(),
     });

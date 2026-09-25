@@ -145,7 +145,7 @@ export default function Dashboard({
           <div>
             <div className="flex items-center space-x-3 mb-2">
               <span className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-                MongoDB Keep Alive Manager
+                {dbInfo.postgres?.configured ? "Multi-DB Keep Alive Manager" : "MongoDB Keep Alive Manager"}
               </span>
               <span
                 className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
@@ -159,7 +159,7 @@ export default function Dashboard({
               </span>
             </div>
             <p className="text-xs sm:text-sm text-gray-400">
-              Automated high-frequency keep-alive pings ensuring your MongoDB Atlas cluster never goes idle.
+              {dbInfo.postgres?.configured ? "Automated keep-alive pings ensuring MongoDB Atlas and PostgreSQL clusters never go idle." : "Automated high-frequency keep-alive pings ensuring your MongoDB Atlas cluster never goes idle."}
             </p>
           </div>
 
@@ -170,9 +170,15 @@ export default function Dashboard({
               <span className="text-white font-semibold">Production Database</span>
             </div>
             <div className="px-3 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 text-gray-300">
-              <span className="text-gray-500 mr-1.5">DB:</span>
+              <span className="text-gray-500 mr-1.5">🍃 Mongo:</span>
               <span className="text-mongo font-semibold">{dbInfo.name || 'system_reset'}</span>
             </div>
+            {dbInfo.postgres?.configured && (
+              <div className="px-3 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 text-gray-300">
+                <span className="text-gray-500 mr-1.5">🐘 Postgres:</span>
+                <span className="text-sky-400 font-semibold">{dbInfo.postgres.name || 'defaultdb'}</span>
+              </div>
+            )}
             <div className="px-3 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 text-gray-300">
               <span className="text-gray-500 mr-1.5">Collection:</span>
               <span className="text-white font-semibold">{dbInfo.collection || 'sysreset'}</span>
@@ -186,7 +192,7 @@ export default function Dashboard({
         <StatusCard
           title="Database Status"
           value={stats.databaseStatus || 'ONLINE'}
-          subtitle={isOnline ? 'MongoDB Atlas operational' : 'Connection unreachable'}
+          subtitle={isOnline ? (dbInfo?.postgres?.configured ? "MongoDB + PostgreSQL online" : "MongoDB Atlas operational") : "Connection unreachable"}
           icon={Server}
           color={isOnline ? 'mongo' : 'blue'}
           pulse={isOnline}
@@ -317,9 +323,20 @@ export default function Dashboard({
 
             <div className="space-y-2.5 font-mono text-xs">
               <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
-                <span className="text-gray-400 font-sans">Database</span>
-                <span className="font-bold text-white truncate">{dbInfo.name || 'system_reset'}</span>
+                <span className="text-gray-400 font-sans flex items-center gap-1.5">
+                  <span>🍃</span> MongoDB
+                </span>
+                <span className="font-bold text-mongo truncate">{dbInfo.name || 'system_reset'}</span>
               </div>
+
+              {dbInfo.postgres?.configured && (
+                <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
+                  <span className="text-gray-400 font-sans flex items-center gap-1.5">
+                    <span>🐘</span> PostgreSQL
+                  </span>
+                  <span className="font-bold text-sky-400 truncate">{dbInfo.postgres.name || 'defaultdb'}</span>
+                </div>
+              )}
 
               <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
                 <span className="text-gray-400 font-sans">Target Collection</span>

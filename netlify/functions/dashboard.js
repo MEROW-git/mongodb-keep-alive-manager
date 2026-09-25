@@ -1,4 +1,5 @@
-const { connectToDatabase } = require('./lib/mongodb');
+﻿const { connectToDatabase } = require('./lib/mongodb');
+const { isPostgresConfigured } = require('./lib/postgres');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 
 exports.handler = async (event, context) => {
@@ -23,6 +24,8 @@ exports.handler = async (event, context) => {
 
   const dbName = process.env.MONGO_DB_NAME || 'system_reset';
   const mainCollection = process.env.WEBADMIN_COLLECTION || 'sysreset';
+  const pgConfigured = isPostgresConfigured();
+  const pgDbName = process.env.postgresql_db || process.env.POSTGRESQL_DB || 'postgresql';
 
   try {
     const { db } = await connectToDatabase();
@@ -93,6 +96,7 @@ exports.handler = async (event, context) => {
           second: '2-digit',
         }),
         latency: item.responseTime || 0,
+        target: item.target || 'MongoDB',
       }));
 
     // Chart 2: Success vs Failed distribution
@@ -139,11 +143,16 @@ exports.handler = async (event, context) => {
       });
     }
 
-    // Format recent activity list
+    // Format recent activity list with target database badge
     const formattedRecentActivity = recentLogs.map((log) => {
       const date = new Date(log.createdAt);
+      const targetLabel = log.target || 'MongoDB';
+      const defaultMsg = log.status === 'SUCCESS' ? `${targetLabel} ping completed` : `${targetLabel} ping failed`;
+
       return {
         id: log._id.toString(),
+        target: targetLabel,
+        database: log.database || (targetLabel === 'PostgreSQL' ? pgDbName : dbName),
         time: date.toLocaleTimeString('en-US', {
           hour12: true,
           hour: 'numeric',
@@ -152,7 +161,7 @@ exports.handler = async (event, context) => {
         fullTimestamp: date.toISOString(),
         status: log.status,
         responseTime: `${log.responseTime || 0} ms`,
-        message: log.status === 'SUCCESS' ? 'Database ping completed' : (log.error || 'Database ping failed'),
+        message: log.error ? `${targetLabel} error: ${log.error}` : defaultMsg,
       };
     });
 
@@ -166,6 +175,14 @@ exports.handler = async (event, context) => {
         name: dbName,
         collection: mainCollection,
         connection: 'Connected',
+        postgres: pgConfigured
+          ? {
+              configured: true,
+              name: pgDbName,
+              status: 'ONLINE',
+              connection: 'Connected',
+            }
+          : { configured: false },
       },
       stats: {
         databaseStatus: 'ONLINE',

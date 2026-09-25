@@ -1,4 +1,4 @@
-const { connectToDatabase } = require('./mongodb');
+﻿const { connectToDatabase } = require('./mongodb');
 require('dotenv').config();
 
 const BOT_TOKEN = process.env.telegram_bot || process.env.TELEGRAM_BOT_TOKEN;
@@ -46,9 +46,16 @@ async function sendTelegramMessage(chatId, text, options = {}) {
 }
 
 /**
- * Dispatch automatic notification when keep-alive ping succeeds
+ * Dispatch automatic notification when keep-alive ping succeeds.
+ * Supports single database or multi-database summary results.
  */
-async function notifyPingSuccess({ latencyMs, dbName = 'system_reset', source = 'KEEP_ALIVE_PULSE' }) {
+async function notifyPingSuccess({
+  latencyMs,
+  dbName = 'system_reset',
+  target = 'MongoDB',
+  source = 'KEEP_ALIVE_PULSE',
+  results = null,
+}) {
   if (!BOT_TOKEN) return;
 
   try {
@@ -56,7 +63,6 @@ async function notifyPingSuccess({ latencyMs, dbName = 'system_reset', source = 
     const settings = await db.collection('settings').findOne({});
 
     // If auto ping notifications are globally disabled in settings, skip
-    // By default, if notifyOnPing is true or unset, we allow it if user requested
     if (settings && settings.telegramNotifyOnPing === false) {
       return;
     }
@@ -96,14 +102,39 @@ async function notifyPingSuccess({ latencyMs, dbName = 'system_reset', source = 
       second: '2-digit',
     });
 
-    const notificationMessage =
-      `🟢 <b>MongoDB Keep-Alive Successful!</b>\n\n` +
-      `• <b>Database:</b> <code>${dbName}</code>\n` +
-      `• <b>Cluster Status:</b> <b>ONLINE &amp; HEALTHY</b>\n` +
-      `• <b>Latency:</b> <code>${latencyMs} ms</code>\n` +
-      `• <b>Source:</b> <code>${source}</code>\n` +
-      `• <b>Timestamp:</b> <code>${timeStr}</code>\n\n` +
-      `✨ <i>Keep-alive pulse confirmed. Database active.</i>`;
+    let notificationMessage = '';
+
+    if (Array.isArray(results) && results.length > 0) {
+      const anyFailed = results.some((r) => r.status === 'FAILED');
+      const headerIcon = anyFailed ? '⚠️' : '🟢';
+      const headerTitle = anyFailed ? 'Keep-Alive Warning' : 'Keep-Alive Pulse Confirmed';
+
+      const lines = results.map((r) => {
+        const icon = r.target === 'PostgreSQL' ? '🐘' : '🍃';
+        if (r.status === 'SUCCESS') {
+          return `${icon} <b>${r.target}:</b> <code>${r.database || r.dbName}</code> (<code>${r.responseTime}ms</code>) - <b>ONLINE</b>`;
+        } else {
+          return `${icon} <b>${r.target}:</b> <code>${r.database || r.dbName}</code> - <b>FAILED</b> (<i>${r.error || 'Timeout'}</i>)`;
+        }
+      });
+
+      notificationMessage =
+        `${headerIcon} <b>${headerTitle}</b>\n\n` +
+        lines.join('\n') +
+        `\n\n📡 <b>Source:</b> <code>${source}</code>\n` +
+        `🕒 <b>Timestamp:</b> <code>${timeStr}</code>\n\n` +
+        `🛡️ <i>All scheduled databases pinged and active.</i>`;
+    } else {
+      const dbIcon = target === 'PostgreSQL' ? '🐘' : '🍃';
+      notificationMessage =
+        `🟢 <b>${target} Keep-Alive Successful!</b>\n\n` +
+        `${dbIcon} <b>Database:</b> <code>${dbName}</code>\n` +
+        `⚡ <b>Status:</b> <b>ONLINE &amp; HEALTHY</b>\n` +
+        `⏱ <b>Latency:</b> <code>${latencyMs} ms</code>\n` +
+        `📡 <b>Source:</b> <code>${source}</code>\n` +
+        `🕒 <b>Timestamp:</b> <code>${timeStr}</code>\n\n` +
+        `🛡️ <i>Keep-alive pulse confirmed. Database active.</i>`;
+    }
 
     for (const chatId of recipientChatIds) {
       try {

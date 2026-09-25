@@ -1,4 +1,4 @@
-const authFn = require('../netlify/functions/auth');
+﻿const authFn = require('../netlify/functions/auth');
 const pingFn = require('../netlify/functions/ping');
 const dashboardFn = require('../netlify/functions/dashboard');
 const logsFn = require('../netlify/functions/logs');
@@ -79,6 +79,7 @@ async function runTests() {
   console.log('Masked URI:', JSON.parse(settingsRes.body).database?.maskedUri);
 
   console.log('\n🎉 ALL 6 BACKEND SERVERLESS FUNCTIONS TESTED & WORKING PERFECTLY!\n');
+  process.exit(0);
 }
 
 runTests().catch(err => {

@@ -1,15 +1,17 @@
-const { MongoClient } = require('mongodb');
+﻿const { MongoClient } = require('mongodb');
+const { isPostgresConfigured, pingPostgres } = require('../netlify/functions/lib/postgres');
 require('dotenv').config();
 
-async function test() {
+async function testMongo() {
   const uri = process.env.MONGO_URI;
   const dbName = process.env.MONGO_DB_NAME || 'system_reset';
-  console.log('Testing connection to MongoDB...');
+  console.log('\n========================================');
+  console.log('🍃 Testing MongoDB Atlas Connection...');
   console.log('Database:', dbName);
 
   if (!uri) {
-    console.error('MONGO_URI is missing in .env');
-    process.exit(1);
+    console.error('❌ MONGO_URI is missing in .env');
+    return;
   }
 
   const client = new MongoClient(uri, {
@@ -21,7 +23,7 @@ async function test() {
     const startTime = Date.now();
     await client.connect();
     const connectTime = Date.now() - startTime;
-    console.log(`Connected successfully in ${connectTime}ms!`);
+    console.log(`✅ MongoDB connected successfully in ${connectTime}ms!`);
 
     const db = client.db(dbName);
     const pingStart = Date.now();
@@ -32,12 +34,41 @@ async function test() {
     console.log(`Ping response time: ${pingTime}ms`);
 
     const collections = await db.listCollections().toArray();
-    console.log('Existing collections:', collections.map(c => c.name));
+    console.log('Existing collections:', collections.map((c) => c.name));
   } catch (err) {
-    console.error('Connection failed:', err.message);
+    console.error('❌ MongoDB Connection failed:', err.message);
   } finally {
     await client.close();
   }
 }
 
-test();
+async function testPostgres() {
+  console.log('\n========================================');
+  console.log('🐘 Testing PostgreSQL Connection...');
+
+  if (!isPostgresConfigured()) {
+    console.log('⚠️ postgresql_url is not configured in .env (Skipped)');
+    return;
+  }
+
+  console.log('Database target:', process.env.postgresql_db || 'postgresql');
+
+  try {
+    const res = await pingPostgres();
+    console.log(`✅ PostgreSQL connected & pinged successfully!`);
+    console.log(`Database: ${res.database}`);
+    console.log(`Latency: ${res.responseTime}ms`);
+    console.log(`Server Timestamp: ${res.timestamp}`);
+  } catch (err) {
+    console.error('❌ PostgreSQL Connection failed:', err.message);
+  }
+}
+
+async function run() {
+  await testMongo();
+  await testPostgres();
+  console.log('\n========================================\n');
+  process.exit(0);
+}
+
+run();

@@ -1,5 +1,5 @@
-import React from 'react';
-import { LayoutDashboard, FileText, Sliders, Server, ShieldCheck, ExternalLink, Bot } from 'lucide-react';
+﻿import React from 'react';
+import { LayoutDashboard, FileText, Sliders, Server, ShieldCheck, ExternalLink, Bot, Database } from 'lucide-react';
 
 export default function Sidebar({ currentTab, setTab, isMobileOpen, closeMobile, dbInfo }) {
   const navItems = [
@@ -48,11 +48,14 @@ export default function Sidebar({ currentTab, setTab, isMobileOpen, closeMobile,
         </nav>
       </div>
 
-      {/* Database Context Widget */}
+      {/* Database Context Widgets */}
       <div className="space-y-3">
+        {/* MongoDB Widget */}
         <div className="p-3.5 rounded-xl bg-cardBg/90 border border-gray-800/80 text-xs">
           <div className="flex items-center justify-between text-gray-400 mb-2">
-            <span className="font-semibold uppercase tracking-wider text-[10px]">MongoDB Atlas</span>
+            <span className="font-semibold uppercase tracking-wider text-[10px] text-mongo flex items-center gap-1.5">
+              <span>🍃</span> MongoDB Atlas
+            </span>
             <span className="flex h-2 w-2 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-mongo opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-mongo"></span>
@@ -68,19 +71,41 @@ export default function Sidebar({ currentTab, setTab, isMobileOpen, closeMobile,
               <span className="text-gray-500">Collection:</span>
               <span className="text-mongo truncate max-w-[110px]">{dbInfo?.collection || 'sysreset'}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Cluster:</span>
-              <span className="text-gray-300">Cluster0</span>
-            </div>
           </div>
         </div>
+
+        {/* PostgreSQL Widget (if configured) */}
+        {dbInfo?.postgres?.configured && (
+          <div className="p-3.5 rounded-xl bg-cardBg/90 border border-gray-800/80 text-xs">
+            <div className="flex items-center justify-between text-gray-400 mb-2">
+              <span className="font-semibold uppercase tracking-wider text-[10px] text-sky-400 flex items-center gap-1.5">
+                <span>🐘</span> PostgreSQL
+              </span>
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-400"></span>
+              </span>
+            </div>
+
+            <div className="space-y-1.5 font-mono text-[11px]">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Database:</span>
+                <span className="text-gray-200 truncate max-w-[110px]">{dbInfo?.postgres?.name || 'defaultdb'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Connection:</span>
+                <span className="text-sky-400">Connected</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center justify-between px-2 text-[11px] text-gray-500">
           <span className="flex items-center space-x-1">
             <ShieldCheck className="w-3.5 h-3.5 text-mongo" />
             <span>Netlify Serverless</span>
           </span>
-          <span className="text-[10px] text-gray-600">v1.0.0</span>
+          <span className="text-[10px] text-gray-600">v1.1.0</span>
         </div>
       </div>
     </div>

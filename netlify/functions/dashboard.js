@@ -1,5 +1,6 @@
 ﻿const { connectToDatabase } = require('./lib/mongodb');
 const { isPostgresConfigured } = require('./lib/postgres');
+const { isMysqlConfigured } = require('./lib/mysql');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 
 exports.handler = async (event, context) => {
@@ -26,6 +27,8 @@ exports.handler = async (event, context) => {
   const mainCollection = process.env.WEBADMIN_COLLECTION || 'sysreset';
   const pgConfigured = isPostgresConfigured();
   const pgDbName = process.env.postgresql_db || process.env.POSTGRESQL_DB || 'postgresql';
+  const mysqlConfigured = isMysqlConfigured();
+  const mysqlDbName = process.env.mysql_db || process.env.MYSQL_DB || 'mysql';
 
   try {
     const { db } = await connectToDatabase();
@@ -149,10 +152,14 @@ exports.handler = async (event, context) => {
       const targetLabel = log.target || 'MongoDB';
       const defaultMsg = log.status === 'SUCCESS' ? `${targetLabel} ping completed` : `${targetLabel} ping failed`;
 
+      let dbTargetName = dbName;
+      if (targetLabel === 'PostgreSQL') dbTargetName = pgDbName;
+      else if (targetLabel === 'MySQL') dbTargetName = mysqlDbName;
+
       return {
         id: log._id.toString(),
         target: targetLabel,
-        database: log.database || (targetLabel === 'PostgreSQL' ? pgDbName : dbName),
+        database: log.database || dbTargetName,
         time: date.toLocaleTimeString('en-US', {
           hour12: true,
           hour: 'numeric',
@@ -179,6 +186,14 @@ exports.handler = async (event, context) => {
           ? {
               configured: true,
               name: pgDbName,
+              status: 'ONLINE',
+              connection: 'Connected',
+            }
+          : { configured: false },
+        mysql: mysqlConfigured
+          ? {
+              configured: true,
+              name: mysqlDbName,
               status: 'ONLINE',
               connection: 'Connected',
             }

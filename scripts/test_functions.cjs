@@ -1,11 +1,13 @@
-﻿const authFn = require('../netlify/functions/auth');
+﻿const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+const authFn = require('../netlify/functions/auth');
 const pingFn = require('../netlify/functions/ping');
 const dashboardFn = require('../netlify/functions/dashboard');
 const logsFn = require('../netlify/functions/logs');
 const settingsFn = require('../netlify/functions/settings');
 
 async function runTests() {
-  console.log('🧪 Testing Netlify Serverless Functions locally...\n');
+  console.log('⚡ Testing Netlify Serverless Functions locally...\n');
 
   // Test 1: Auth Login
   console.log('1. Testing auth.js (Login)...');
@@ -53,6 +55,7 @@ async function runTests() {
   console.log('Dashboard Status Code:', dashRes.statusCode);
   const dashData = JSON.parse(dashRes.body);
   console.log('DB Status:', dashData.databaseStatus);
+  console.log('Database Objects:', dashData.database);
   console.log('Total Successful Pings:', dashData.stats?.totalSuccessfulPing);
   console.log('Response Time:', dashData.stats?.responseTime);
   console.log('Latency history points:', dashData.charts?.latencyHistory?.length);

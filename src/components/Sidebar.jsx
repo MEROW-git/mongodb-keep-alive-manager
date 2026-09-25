@@ -100,12 +100,38 @@ export default function Sidebar({ currentTab, setTab, isMobileOpen, closeMobile,
           </div>
         )}
 
+        {/* MySQL Widget (if configured) */}
+        {dbInfo?.mysql?.configured && (
+          <div className="p-3.5 rounded-xl bg-cardBg/90 border border-gray-800/80 text-xs">
+            <div className="flex items-center justify-between text-gray-400 mb-2">
+              <span className="font-semibold uppercase tracking-wider text-[10px] text-amber-400 flex items-center gap-1.5">
+                <span>🐬</span> MySQL
+              </span>
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
+              </span>
+            </div>
+
+            <div className="space-y-1.5 font-mono text-[11px]">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Database:</span>
+                <span className="text-gray-200 truncate max-w-[110px]">{dbInfo?.mysql?.name || 'mysql'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Connection:</span>
+                <span className="text-amber-400">Connected</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between px-2 text-[11px] text-gray-500">
           <span className="flex items-center space-x-1">
             <ShieldCheck className="w-3.5 h-3.5 text-mongo" />
             <span>Netlify Serverless</span>
           </span>
-          <span className="text-[10px] text-gray-600">v1.1.0</span>
+          <span className="text-[10px] text-gray-600">v1.2.0</span>
         </div>
       </div>
     </div>

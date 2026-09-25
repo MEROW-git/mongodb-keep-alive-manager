@@ -1,6 +1,8 @@
-﻿const { MongoClient } = require('mongodb');
+﻿const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+const { MongoClient } = require('mongodb');
 const { isPostgresConfigured, pingPostgres } = require('../netlify/functions/lib/postgres');
-require('dotenv').config();
+const { isMysqlConfigured, pingMysql } = require('../netlify/functions/lib/mysql');
 
 async function testMongo() {
   const uri = process.env.MONGO_URI;
@@ -64,9 +66,32 @@ async function testPostgres() {
   }
 }
 
+async function testMysql() {
+  console.log('\n========================================');
+  console.log('🐬 Testing MySQL Connection...');
+
+  if (!isMysqlConfigured()) {
+    console.log('⚠️ mysql_url is not configured in .env (Skipped)');
+    return;
+  }
+
+  console.log('Database target:', process.env.mysql_db || process.env.MYSQL_DB || 'mysql');
+
+  try {
+    const res = await pingMysql();
+    console.log(`✅ MySQL connected & pinged successfully!`);
+    console.log(`Database: ${res.database}`);
+    console.log(`Latency: ${res.responseTime}ms`);
+    console.log(`Server Timestamp: ${res.timestamp}`);
+  } catch (err) {
+    console.error('❌ MySQL Connection failed:', err.message);
+  }
+}
+
 async function run() {
   await testMongo();
   await testPostgres();
+  await testMysql();
   console.log('\n========================================\n');
   process.exit(0);
 }

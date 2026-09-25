@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   Server,
   Activity,
@@ -32,6 +32,13 @@ export default function Dashboard({
   const charts = dashboardData?.charts || {};
 
   const isOnline = dashboardData?.databaseStatus === 'ONLINE';
+  const isMultiDb = Boolean(dbInfo.postgres?.configured || dbInfo.mysql?.configured);
+
+  const configuredDatabasesList = [
+    'MongoDB',
+    dbInfo.postgres?.configured && 'PostgreSQL',
+    dbInfo.mysql?.configured && 'MySQL',
+  ].filter(Boolean);
 
   // 60fps Ultra-smooth countdown timer via requestAnimationFrame & direct DOM ref
   const progressBarRef = useRef(null);
@@ -137,7 +144,7 @@ export default function Dashboard({
   return (
     <div className="space-y-6">
       
-      {/* Top Banner: Atlas Cluster & Overview */}
+      {/* Top Banner: Cluster & Overview */}
       <div className="glass-panel rounded-2xl p-6 bg-gradient-to-r from-cardBg via-cardBg to-gray-900/60 border border-gray-800/90 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-full bg-mongo/5 blur-3xl pointer-events-none" />
 
@@ -145,7 +152,7 @@ export default function Dashboard({
           <div>
             <div className="flex items-center space-x-3 mb-2">
               <span className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-                {dbInfo.postgres?.configured ? "Multi-DB Keep Alive Manager" : "MongoDB Keep Alive Manager"}
+                {isMultiDb ? "Multi-DB Keep Alive Manager" : "MongoDB Keep Alive Manager"}
               </span>
               <span
                 className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
@@ -159,7 +166,9 @@ export default function Dashboard({
               </span>
             </div>
             <p className="text-xs sm:text-sm text-gray-400">
-              {dbInfo.postgres?.configured ? "Automated keep-alive pings ensuring MongoDB Atlas and PostgreSQL clusters never go idle." : "Automated high-frequency keep-alive pings ensuring your MongoDB Atlas cluster never goes idle."}
+              {isMultiDb
+                ? `Automated keep-alive pings ensuring ${configuredDatabasesList.join(', ')} databases never go idle.`
+                : "Automated high-frequency keep-alive pings ensuring your MongoDB Atlas cluster never goes idle."}
             </p>
           </div>
 
@@ -179,6 +188,12 @@ export default function Dashboard({
                 <span className="text-sky-400 font-semibold">{dbInfo.postgres.name || 'defaultdb'}</span>
               </div>
             )}
+            {dbInfo.mysql?.configured && (
+              <div className="px-3 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 text-gray-300">
+                <span className="text-gray-500 mr-1.5">🐬 MySQL:</span>
+                <span className="text-amber-400 font-semibold">{dbInfo.mysql.name || 'mysql'}</span>
+              </div>
+            )}
             <div className="px-3 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 text-gray-300">
               <span className="text-gray-500 mr-1.5">Collection:</span>
               <span className="text-white font-semibold">{dbInfo.collection || 'sysreset'}</span>
@@ -192,7 +207,13 @@ export default function Dashboard({
         <StatusCard
           title="Database Status"
           value={stats.databaseStatus || 'ONLINE'}
-          subtitle={isOnline ? (dbInfo?.postgres?.configured ? "MongoDB + PostgreSQL online" : "MongoDB Atlas operational") : "Connection unreachable"}
+          subtitle={
+            isOnline
+              ? isMultiDb
+                ? `${configuredDatabasesList.join(' + ')} online`
+                : 'MongoDB Atlas operational'
+              : 'Connection unreachable'
+          }
           icon={Server}
           color={isOnline ? 'mongo' : 'blue'}
           pulse={isOnline}
@@ -208,7 +229,7 @@ export default function Dashboard({
         <StatusCard
           title="Response Time"
           value={stats.responseTime || '0 ms'}
-          subtitle="Latency (ping: 1)"
+          subtitle="Latency (ping query)"
           icon={Activity}
           color="purple"
         />
@@ -338,6 +359,15 @@ export default function Dashboard({
                 </div>
               )}
 
+              {dbInfo.mysql?.configured && (
+                <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
+                  <span className="text-gray-400 font-sans flex items-center gap-1.5">
+                    <span>🐬</span> MySQL
+                  </span>
+                  <span className="font-bold text-amber-400 truncate">{dbInfo.mysql.name || 'mysql'}</span>
+                </div>
+              )}
+
               <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
                 <span className="text-gray-400 font-sans">Target Collection</span>
                 <span className="font-bold text-mongo truncate">{dbInfo.collection || 'sysreset'}</span>
@@ -354,8 +384,8 @@ export default function Dashboard({
           </div>
 
           <div className="mt-4 pt-3 border-t border-gray-800/80 flex items-center justify-between text-xs text-gray-400">
-            <span>Driver Pool</span>
-            <span className="font-mono text-gray-300">10 Pooled Connections</span>
+            <span>Keep-Alive Engine</span>
+            <span className="font-mono text-gray-300">Connection Pooling</span>
           </div>
         </div>
 
@@ -432,7 +462,7 @@ export default function Dashboard({
 
           <div className="mt-4 pt-3 border-t border-gray-800/80 flex items-center justify-between text-xs text-gray-400">
             <span>Ping command</span>
-            <span className="font-mono text-mongo text-[11px]">{'{ ping: 1 }'}</span>
+            <span className="font-mono text-mongo text-[11px]">Multi-DB Ping</span>
           </div>
         </div>
 

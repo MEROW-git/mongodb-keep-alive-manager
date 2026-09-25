@@ -1,5 +1,6 @@
 ﻿const { connectToDatabase } = require('./lib/mongodb');
 const { isPostgresConfigured, pingPostgres } = require('./lib/postgres');
+const { isMysqlConfigured, pingMysql } = require('./lib/mysql');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 const { notifyPingSuccess } = require('./lib/telegramNotifier');
 
@@ -138,7 +139,53 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // 3. Broadcast keep-alive notification to approved Telegram subscribers
+    // 3. Ping MySQL (if configured)
+    if (isMysqlConfigured()) {
+      const mysqlStart = Date.now();
+      try {
+        const mysqlRes = await pingMysql();
+        await logsCol.insertOne({
+          action: 'PING',
+          target: 'MySQL',
+          status: 'SUCCESS',
+          database: mysqlRes.database,
+          responseTime: mysqlRes.responseTime,
+          source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
+          createdAt: new Date(),
+        });
+
+        pingResults.push({
+          target: 'MySQL',
+          status: 'SUCCESS',
+          database: mysqlRes.database,
+          responseTime: mysqlRes.responseTime,
+        });
+      } catch (mysqlErr) {
+        const mysqlLatency = Date.now() - mysqlStart;
+        console.error('MySQL Ping operation failed:', mysqlErr);
+
+        await logsCol.insertOne({
+          action: 'PING',
+          target: 'MySQL',
+          status: 'FAILED',
+          database: process.env.mysql_db || process.env.MYSQL_DB || 'mysql',
+          responseTime: mysqlLatency,
+          error: mysqlErr.message || 'MySQL ping error',
+          source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
+          createdAt: new Date(),
+        });
+
+        pingResults.push({
+          target: 'MySQL',
+          status: 'FAILED',
+          database: process.env.mysql_db || process.env.MYSQL_DB || 'mysql',
+          responseTime: mysqlLatency,
+          error: mysqlErr.message,
+        });
+      }
+    }
+
+    // 4. Broadcast keep-alive notification to approved Telegram subscribers
     notifyPingSuccess({
       results: pingResults,
       source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',

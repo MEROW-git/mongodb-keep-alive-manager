@@ -25,7 +25,6 @@ async function sendTelegramMessage(chatId, text, options = {}) {
 
     const data = await res.json();
     if (!data.ok) {
-      // Fallback without parse_mode if formatting has issues
       const plainText = text.replace(/<[^>]*>/g, '').replace(/[*_`]/g, '');
       const retryRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         method: 'POST',
@@ -43,6 +42,12 @@ async function sendTelegramMessage(chatId, text, options = {}) {
     console.error('sendTelegramMessage error:', err.message);
     return null;
   }
+}
+
+function getDatabaseIcon(target) {
+  if (target === 'PostgreSQL') return '🐘';
+  if (target === 'MySQL') return '🐬';
+  return '🍃';
 }
 
 /**
@@ -110,7 +115,7 @@ async function notifyPingSuccess({
       const headerTitle = anyFailed ? 'Keep-Alive Warning' : 'Keep-Alive Pulse Confirmed';
 
       const lines = results.map((r) => {
-        const icon = r.target === 'PostgreSQL' ? '🐘' : '🍃';
+        const icon = getDatabaseIcon(r.target);
         if (r.status === 'SUCCESS') {
           return `${icon} <b>${r.target}:</b> <code>${r.database || r.dbName}</code> (<code>${r.responseTime}ms</code>) - <b>ONLINE</b>`;
         } else {
@@ -125,7 +130,7 @@ async function notifyPingSuccess({
         `🕒 <b>Timestamp:</b> <code>${timeStr}</code>\n\n` +
         `🛡️ <i>All scheduled databases pinged and active.</i>`;
     } else {
-      const dbIcon = target === 'PostgreSQL' ? '🐘' : '🍃';
+      const dbIcon = getDatabaseIcon(target);
       notificationMessage =
         `🟢 <b>${target} Keep-Alive Successful!</b>\n\n` +
         `${dbIcon} <b>Database:</b> <code>${dbName}</code>\n` +

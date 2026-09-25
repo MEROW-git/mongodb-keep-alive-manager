@@ -5,11 +5,11 @@ const { isMysqlConfigured, pingMysql } = require('./lib/mysql');
 const { notifyPingSuccess } = require('./lib/telegramNotifier');
 
 /**
- * Netlify Scheduled Function: runs automatically every 5 minutes
- * to ping MongoDB Atlas, PostgreSQL, and MySQL to keep all databases active.
+ * Netlify Scheduled Function / Local Cron Handler:
+ * pings MongoDB Atlas, PostgreSQL, and MySQL to keep all databases active.
  */
-const scheduledPingHandler = async (event, context) => {
-  console.log('⚡ Netlify Scheduled Function triggered for Keep Alive...');
+const scheduledPingHandler = async (event = {}, context = {}) => {
+  console.log('⚡ Keep-Alive ping handler triggered...');
   const mongoDbName = process.env.MONGO_DB_NAME || 'system_reset';
   const pingResults = [];
 
@@ -40,7 +40,7 @@ const scheduledPingHandler = async (event, context) => {
         status: 'SUCCESS',
         database: mongoDbName,
         responseTime: mongoLatency,
-        source: 'NETLIFY_SCHEDULED_CRON',
+        source: 'SCHEDULED_CRON',
         createdAt: new Date(),
       });
 
@@ -50,10 +50,10 @@ const scheduledPingHandler = async (event, context) => {
         database: mongoDbName,
         responseTime: mongoLatency,
       });
-      console.log(`✅ Scheduled MongoDB Ping Success: ${mongoLatency}ms`);
+      console.log(`✅ MongoDB Ping Success: ${mongoLatency}ms`);
     } catch (mongoErr) {
       const mongoLatency = Date.now() - mongoStart;
-      console.error('❌ Scheduled MongoDB Ping Failed:', mongoErr.message);
+      console.error('❌ MongoDB Ping Failed:', mongoErr.message);
 
       await logsCol.insertOne({
         action: 'PING',
@@ -61,7 +61,7 @@ const scheduledPingHandler = async (event, context) => {
         status: 'FAILED',
         database: mongoDbName,
         responseTime: mongoLatency,
-        source: 'NETLIFY_SCHEDULED_CRON',
+        source: 'SCHEDULED_CRON',
         error: mongoErr.message,
         createdAt: new Date(),
       });
@@ -86,7 +86,7 @@ const scheduledPingHandler = async (event, context) => {
           status: 'SUCCESS',
           database: pgRes.database,
           responseTime: pgRes.responseTime,
-          source: 'NETLIFY_SCHEDULED_CRON',
+          source: 'SCHEDULED_CRON',
           createdAt: new Date(),
         });
 
@@ -96,10 +96,10 @@ const scheduledPingHandler = async (event, context) => {
           database: pgRes.database,
           responseTime: pgRes.responseTime,
         });
-        console.log(`✅ Scheduled PostgreSQL Ping Success: ${pgRes.responseTime}ms`);
+        console.log(`✅ PostgreSQL Ping Success: ${pgRes.responseTime}ms`);
       } catch (pgErr) {
         const pgLatency = Date.now() - pgStart;
-        console.error('❌ Scheduled PostgreSQL Ping Failed:', pgErr.message);
+        console.error('❌ PostgreSQL Ping Failed:', pgErr.message);
 
         await logsCol.insertOne({
           action: 'PING',
@@ -107,7 +107,7 @@ const scheduledPingHandler = async (event, context) => {
           status: 'FAILED',
           database: process.env.postgresql_db || 'postgresql',
           responseTime: pgLatency,
-          source: 'NETLIFY_SCHEDULED_CRON',
+          source: 'SCHEDULED_CRON',
           error: pgErr.message,
           createdAt: new Date(),
         });
@@ -133,7 +133,7 @@ const scheduledPingHandler = async (event, context) => {
           status: 'SUCCESS',
           database: mysqlRes.database,
           responseTime: mysqlRes.responseTime,
-          source: 'NETLIFY_SCHEDULED_CRON',
+          source: 'SCHEDULED_CRON',
           createdAt: new Date(),
         });
 
@@ -143,10 +143,10 @@ const scheduledPingHandler = async (event, context) => {
           database: mysqlRes.database,
           responseTime: mysqlRes.responseTime,
         });
-        console.log(`✅ Scheduled MySQL Ping Success: ${mysqlRes.responseTime}ms`);
+        console.log(`✅ MySQL Ping Success: ${mysqlRes.responseTime}ms`);
       } catch (mysqlErr) {
         const mysqlLatency = Date.now() - mysqlStart;
-        console.error('❌ Scheduled MySQL Ping Failed:', mysqlErr.message);
+        console.error('❌ MySQL Ping Failed:', mysqlErr.message);
 
         await logsCol.insertOne({
           action: 'PING',
@@ -154,7 +154,7 @@ const scheduledPingHandler = async (event, context) => {
           status: 'FAILED',
           database: process.env.mysql_db || process.env.MYSQL_DB || 'mysql',
           responseTime: mysqlLatency,
-          source: 'NETLIFY_SCHEDULED_CRON',
+          source: 'SCHEDULED_CRON',
           error: mysqlErr.message,
           createdAt: new Date(),
         });
@@ -172,8 +172,8 @@ const scheduledPingHandler = async (event, context) => {
     // 5. Send Telegram notification to subscribers
     notifyPingSuccess({
       results: pingResults,
-      source: 'NETLIFY_SCHEDULED_CRON',
-    }).catch((e) => console.error('Scheduled cron telegram notification error:', e.message));
+      source: 'SCHEDULED_CRON',
+    }).catch((e) => console.error('Telegram notification error:', e.message));
 
     return {
       statusCode: 200,
@@ -184,7 +184,7 @@ const scheduledPingHandler = async (event, context) => {
       }),
     };
   } catch (error) {
-    console.error('❌ Scheduled Ping Handler Critical Error:', error.message);
+    console.error('❌ Keep-Alive Ping Handler Critical Error:', error.message);
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -197,3 +197,4 @@ const scheduledPingHandler = async (event, context) => {
 
 // Schedule every 5 minutes (standard Netlify cron expression)
 exports.handler = schedule('*/5 * * * *', scheduledPingHandler);
+exports.scheduledPingHandler = scheduledPingHandler;

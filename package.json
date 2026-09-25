@@ -1,13 +1,16 @@
-{
+﻿{
   "name": "mongodb-keep-alive-manager",
   "version": "1.0.0",
   "private": true,
-  "description": "Production-ready lightweight MongoDB Atlas Keep Alive Manager and Admin Dashboard for Netlify",
+  "description": "Production-ready lightweight Multi-Database Keep Alive Manager and Admin Dashboard for Raspberry Pi, local servers, and Netlify",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "seed": "node scripts/seed.cjs"
+    "start": "node server.cjs",
+    "seed": "node scripts/seed.cjs",
+    "test:db": "node scripts/test_db.cjs",
+    "test:fn": "node scripts/test_functions.cjs"
   },
   "dependencies": {
     "@netlify/functions": "^2.8.2",

@@ -1,219 +1,257 @@
-<div align="center">
+﻿# ⚡ Multi-Database Keep-Alive Manager & Admin Dashboard
 
-  <h1>⚡ MongoDB Keep Alive Manager</h1>
-
-  <p><strong>Smart, ultra-lightweight keep-alive automation, Telegram Bot control center & real-time health monitoring dashboard for MongoDB Atlas.</strong></p>
-
-  <p>
-    Prevent idle cluster spin-downs, maintain warm serverless connection pools, receive live Telegram keep-alive alerts, and track database latency 24/7 with zero always-running backend overhead.
-  </p>
-
-  <p>
-    <img src="https://img.shields.io/badge/MongoDB-Atlas%20%26%20Serverless-00ED64?style=for-the-badge&logo=mongodb&logoColor=black" alt="MongoDB Atlas" />
-    <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 18" />
-    <img src="https://img.shields.io/badge/Vite-Bundler-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
-    <img src="https://img.shields.io/badge/Tailwind_CSS-Modern_Dark-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS" />
-    <img src="https://img.shields.io/badge/Telegram-Bot%20API-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram Bot" />
-    <img src="https://img.shields.io/badge/Netlify-Serverless_Functions-00C7B7?style=for-the-badge&logo=netlify&logoColor=white" alt="Netlify Serverless" />
-    <img src="https://img.shields.io/badge/Auth-bcrypt_%2B_JWT-F59E0B?style=for-the-badge&logo=jsonwebtokens&logoColor=black" alt="Auth" />
-  </p>
-
-  <p>
-    <a href="#-key-features">Features</a> •
-    <a href="#-architecture">Architecture</a> •
-    <a href="#-quick-start">Quick Start</a> •
-    <a href="#-telegram-bot-integration">Telegram Bot</a> •
-    <a href="#-keep-alive-engine">Keep-Alive Engine</a> •
-    <a href="#-deployment-to-netlify">Netlify Deployment</a> •
-    <a href="#-security--privacy">Security</a>
-  </p>
-
-</div>
+> A high-performance, lightweight, daemonless keep-alive manager and real-time dashboard designed for **MongoDB Atlas**, **PostgreSQL**, and **MySQL**. Prevents free-tier and serverless databases from pausing, sleeping, or spinning down due to inactivity.
 
 ---
 
-> **Why this matters:** MongoDB Atlas shared and free tier clusters automatically drop connections or suffer extreme cold starts (1,500ms+) when inactive. **MongoDB Keep Alive Manager** executes scheduled serverless keep-alive pulses, pools connections, streams live notifications to Telegram, and visualizes ping latency in a sleek dark dashboard—keeping your production databases blazing fast without paying for a dedicated virtual server.
+## 🌟 Highlights
+
+- **Multi-Database Support**: Automated keep-alive pings for **MongoDB Atlas**, **PostgreSQL** (Aiven, Neon, Supabase, Render), and **MySQL** (Aiven, PlanetScale, TiDB, Clever Cloud).
+- **Raspberry Pi & Local Wi-Fi Ready**: Host on a Raspberry Pi, mini-PC, or home server and access the dashboard from any phone, laptop, or computer connected to the same Wi-Fi router.
+- **24/7 Autonomous Background Pings**: Built-in scheduler automatically executes pings every 5 minutes—no browser tab needed.
+- **Telegram Bot Integration**: Remote management via Telegram bot (`/status`, `/ping`, instant touch controls, access approval gate, ban list, and real-time failure alerts).
+- **Zero-Leak Security**: Strict server-side credential isolation. Connection strings, passwords, and tokens never leak into client bundles.
+- **Flexible Deployment**: Runs anywhere—Raspberry Pi OS, Debian/Ubuntu, Docker, local Node.js, or Netlify Serverless.
 
 ---
 
-## 🚀 Key Features
+## 📐 System Architecture
 
-| Capability | Technical Implementation | Benefit |
-| :--- | :--- | :--- |
-| **Active Keep-Alive Bot** | `db.command({ ping: 1 })` | Keeps MongoDB Atlas cluster warm and prevents idle sleep. |
-| **60fps Smooth Countdown** | `requestAnimationFrame` + DOM Ref | Butter-smooth, real-time live progress bar ticking down to the next cycle. |
-| **12-Hour AM/PM Clocks** | Locale-aware 12-hour formatting | Intuitive timestamp formatting (`04:42:24 PM`) across all cards, charts, feeds, and logs. |
-| **Telegram Bot Control Center** | Telegram Bot API + Long-polling & Webhook | Live chat detection, subscriber approvals, ban control, and broadcast messaging. |
-| **User Access Approval Gate** | Role-based Telegram authorization | Restricts bot commands (`/ping`, `/status`) and keeps database credentials private until approved. |
-| **Push Notifications** | Automated Telegram broadcast alerts | Delivers real-time keep-alive pulses and latency reports to approved subscribers. |
-| **Netlify Scheduled Functions** | `@netlify/functions` CRON Schedule | Runs automatically on schedule (`schedule('*/5 * * * *')`) with zero server maintenance. |
-| **Connection Pooling** | Warm client reuse across serverless calls | Eliminates TLS handshake overhead, slashing ping latency from ~800ms to **~40ms**. |
-| **External Webhook Trigger** | Secured HTTP GET/POST with token | Trigger pings from UptimeRobot, cron-job.org, or GitHub Actions via `CRON_SECRET`. |
-| **Real-time Analytics** | Recharts Area, Donut, and Bar charts | Visualizes latency trends, success ratios, and 7-day activity volume. |
-| **Mobile-First Responsive UI** | Adaptive card-based mobile layout | Optimized layout for mobile, tablet, and desktop without horizontal clipping or scrollbar clutter. |
-| **Bcrypt & JWT Auth** | Salted password hashing & 7-day tokens | Secure, stateless authentication. Never stores or exposes raw passwords. |
-| **Safe Database Isolation** | Preserves existing collections | Target collections (like `sysreset`) remain untouched while telemetry logs separately. |
-
----
-
-## 🏛️ Architecture Overview
-
-```
-                          ┌────────────────────────┐
-                          │   React 18 + Vite UI   │
-                          │ (Tailwind Glassmorphic)│
-                          └───────────┬────────────┘
-                                      │  JWT Authenticated / REST
-                                      ▼
-                        ┌───────────────────────────┐
-                        │ Netlify Functions (/api/) │
-                        ├─────────────┬─────────────┤
-                        │   auth.js   │ dashboard.js│
-                        │   ping.js   │   logs.js   │
-                        │ settings.js │ telegram.js │
-                        └──────┬──────┴──────┬──────┘
-                               │             │
-                               │             ▼
-                               │ ┌───────────────────────────┐
-                               │ │     Telegram Bot API      │
-                               │ │  (@meow_db_notification)  │
-                               │ └───────────────────────────┘
-                               ▼
-            ┌─────────────────────────────────────┐
-            │ Cached MongoDB Serverless Pool (10) │
-            └──────────────────┬──────────────────┘
-                               │  ping: 1 (TLS)
-                               ▼
-                 ┌───────────────────────────┐
-                 │    MongoDB Atlas Cloud    │
-                 │  Cluster0 (system_reset)  │
-                 └───────────────────────────┘
+```text
+ ┌────────────────────────────────────────────────────────┐
+ │   Local Wi-Fi Network / Same Router (Phones, Laptops)  │
+ └───────────────────────────┬────────────────────────────┘
+                             │  HTTP (Port 5173)
+                             ▼
+ ┌────────────────────────────────────────────────────────┐
+ │          Raspberry Pi / Home Server (0.0.0.0)          │
+ │  ┌──────────────────────────────────────────────────┐  │
+ │  │      Vite React SPA Dashboard (Tailwind CSS)     │  │
+ │  └────────────────────────┬─────────────────────────┘  │
+ │                           │ JWT Authenticated REST     │
+ │  ┌────────────────────────▼─────────────────────────┐  │
+ │  │        Node.js Backend & Serverless API          │  │
+ │  │  auth.js • dashboard.js • ping.js • logs.js      │  │
+ │  │  settings.js • telegram.js • scheduled-ping.js   │  │
+ │  └────────────────────────┬─────────────────────────┘  │
+ │                           │ Connection Pooling (TLS)   │
+ └───────────────────────────┼────────────────────────────┘
+                             │
+         ┌───────────────────┼───────────────────┐
+         ▼                   ▼                   ▼
+   🍃 MongoDB Atlas     🐘 PostgreSQL        🐬 MySQL
+ (Atlas M0 Clusters)  (Aiven/Neon/Supabase) (Aiven/PlanetScale)
 ```
 
 ---
 
-## ⚡ Quick Start
+## 🍓 Raspberry Pi / Local Wi-Fi Setup Guide
 
-### 1. Clone & Install Dependencies
+This guide is for hosting the bot on a Raspberry Pi connected to your home Wi-Fi router so you can access the dashboard from any device on your local network.
+
+### 1. Prerequisites on Raspberry Pi
+Ensure Node.js (v18 or v20+) and Git are installed on your Raspberry Pi:
+```bash
+# Update packages
+sudo apt update && sudo apt upgrade -y
+
+# Install Node.js (via NodeSource if not already installed)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs git
+```
+
+Verify installation:
+```bash
+node -v   # Should be v18+ or v20+
+npm -v
+```
+
+---
+
+### 2. Clone and Install Dependencies
 ```bash
 git clone https://github.com/MEROW-git/mongodb-keep-alive-manager.git
 cd mongodb-keep-alive-manager
 npm install
 ```
 
-### 2. Configure Environment Variables
+---
+
+### 3. Configure Environment Variables
 Copy `.env.example` to `.env`:
 ```bash
 cp .env.example .env
+nano .env
 ```
 
-Edit `.env` with your credentials:
+Configure your credentials:
 ```env
-# MongoDB Atlas Connection
-MONGO_URI=mongodb+srv://<username>:<password>@cluster0.zohxxqm.mongodb.net/?retryWrites=true&w=majority
+# 🍃 MongoDB Atlas (Required)
+MONGO_URI=mongodb+srv://<user>:<password>@cluster0.zohxxqm.mongodb.net/?retryWrites=true&w=majority
 MONGO_DB_NAME=system_reset
 WEBADMIN_COLLECTION=sysreset
 
-# JWT Authentication
-JWT_SECRET=your_super_secret_jwt_key_here
+# 🐘 PostgreSQL (Optional - leave blank if not used)
+postgresql_url=postgresql://<user>:<password>@<host>:<port>/<database>?sslmode=require
+postgresql_db=defaultdb
 
-# Initial Admin Credentials (used by seed script or auto-initialization)
+# 🐬 MySQL (Optional - leave blank if not used)
+mysql_url=mysql://<user>:<password>@<host>:<port>/<database>
+mysql_db=mysql
+
+# 🔐 Security & Admin Login
+JWT_SECRET=your_super_secret_jwt_random_key_here
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your_secure_password
+ADMIN_PASSWORD=your_secure_password_here
 
-# Secret Token for Cron / External Keep Alive Webhook Triggers
+# ⚡ Keep-Alive Webhook Trigger Token
 CRON_SECRET=your_custom_cron_secret_trigger_token
 
-# Telegram Bot Token (from @BotFather)
+# 🤖 Telegram Bot Token (from @BotFather)
 telegram_bot=1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ
 ```
 
-### 3. Initialize Admin & Database
-Seed your MongoDB database with your admin credentials and baseline ping:
+---
+
+### 4. Test Database Connections
+Verify all configured databases can connect and ping:
 ```bash
-npm run seed
+npm run test:db
+```
+You should see:
+```text
+🍃 Testing MongoDB Atlas Connection...  -> ✅ connected & pinged!
+🐘 Testing PostgreSQL Connection...     -> ✅ connected & pinged!
+🐬 Testing MySQL Connection...          -> ✅ connected & pinged!
 ```
 
-### 4. Run Development Server
+---
+
+### 5. Find Your Raspberry Pi's Local IP Address
+Run:
 ```bash
-npm run dev
+hostname -I
 ```
-Open **[http://localhost:5173](http://localhost:5173)** in your browser.
-*(The built-in Vite development proxy seamlessly executes Netlify Functions locally without requiring a separate backend process!)*
+Look for your Wi-Fi IPv4 address (e.g. `192.168.1.45` or `192.168.0.100`).
 
 ---
 
-## 🤖 Telegram Bot Integration
+### 6. Run the Application
 
-MongoDB Keep Alive Manager features a built-in Telegram Bot controller (`@meow_db_notification_bot`):
+#### Option A: Production Mode (Recommended for 24/7 Raspberry Pi)
+Build the frontend once, then run the ultra-lightweight standalone server (~35MB RAM, low CPU):
+```bash
+npm run build
+npm start
+```
+The server will output:
+```text
+============================================================
+🚀 Multi-DB Keep Alive Manager Server is Running!
+============================================================
+🌐 Local:        http://localhost:5173
+📡 Wi-Fi / LAN:  http://192.168.1.45:5173
+⚙️  Databases:    MongoDB Atlas + PostgreSQL + MySQL
+============================================================
+```
+Now, open your phone or PC connected to the same Wi-Fi and browse to:
+**`http://192.168.1.45:5173`**
 
-### 1. Bot Features
-- **Warm Welcome Gate**: When a new user sends `/start`, the bot greets them with a warm welcome without exposing database names or internal IDs until an administrator approves them.
-- **Admin Approval Workflow**: In the **Telegram Bot** tab, newly detected users appear under **Detected Telegram Users & Access Approvals**:
-  - Click **Allow** to grant access to bot commands and automated keep-alive alerts.
-  - Click **Revoke** to withdraw access at any time.
-  - Click **Target** to set the user as the recipient for custom broadcast messages.
-- **Interactive Inline Buttons**: Authorized users can trigger keep-alive pings and check cluster status directly inside Telegram using touch buttons:
-  - 🟢 **Cluster Status** (`/status`)
-  - ⚡ **Keep-Alive Pulse** (`/ping`)
-  - ⏱️ **Ping Latency** (`/latency`)
-- **Real-Time Live Chat Feed**: Streams incoming messages and commands in real time with 3-second auto-refresh. Admins can click **Reply** to quickly message any user.
-- **Push Notification Subscriptions**: Automatically dispatches keep-alive pulse confirmations and emergency failure alerts to approved users.
-- **User Ban Control**: Blacklist unauthorized or abusive users by User ID or username to permanently block them from interacting with the bot.
-
-### 2. Setting Up Webhook (Optional for Production)
-The bot works out of the box using server-side sync. For instant webhook delivery on Netlify:
-```http
-POST https://api.telegram.org/bot<YOUR_TELEGRAM_BOT_TOKEN>/setWebhook?url=https://<your-app>.netlify.app/.netlify/functions/telegram?action=webhook
+#### Option B: Development Mode
+```bash
+npm run dev -- --host
 ```
 
 ---
 
-## ⏱️ Keep-Alive Engine
+### 7. Run 24/7 on Boot with PM2 (Optional)
+To ensure the bot keeps running automatically even if your Raspberry Pi reboots or loses power:
 
-The application supports **three concurrent methods** to maintain database warmth:
+```bash
+# Install PM2 process manager
+sudo npm install -g pm2
 
-1. **Netlify Scheduled Functions**: Runs every 5 minutes natively via Netlify's background cron worker (`scheduled-ping.js`).
-2. **In-Dashboard Autonomous Runner**: When the dashboard tab is open in your browser, it runs a synchronized 60fps countdown ticker that automatically triggers a keep-alive pulse at the end of each interval.
-3. **External Webhooks / Uptime Monitors**:
-   Hook any free external monitoring service (e.g. [cron-job.org](https://cron-job.org), [UptimeRobot](https://uptimerobot.com)) to:
-   ```http
-   GET https://<your-app>.netlify.app/.netlify/functions/ping?key=YOUR_CRON_SECRET
-   ```
+# Start the server with PM2
+pm2 start server.cjs --name "keepdb-alive"
+
+# Save PM2 process list
+pm2 save
+
+# Generate and configure systemd startup service
+pm2 startup
+# (Run the sudo command that PM2 prints on screen)
+```
+
+Useful PM2 commands:
+```bash
+pm2 status               # Check status
+pm2 logs keepdb-alive    # View live logs and ping times
+pm2 restart keepdb-alive # Restart server
+pm2 stop keepdb-alive    # Stop server
+```
 
 ---
 
-## 🚢 Deployment to Netlify
+## ☁️ Cloud Deployment (Netlify)
+
+You can also deploy to Netlify for 100% free serverless hosting:
 
 1. Push your repository to **GitHub**.
 2. Connect your repo in the [Netlify Dashboard](https://app.netlify.com/).
-3. Netlify automatically detects build configuration from `netlify.toml`:
+3. Netlify automatically reads configuration from `netlify.toml`:
    - **Build Command**: `npm run build`
    - **Publish Directory**: `dist`
    - **Functions Directory**: `netlify/functions`
-4. Configure your environment variables in **Site Settings > Environment Variables**:
-   - `MONGO_URI`
-   - `MONGO_DB_NAME` (`system_reset`)
-   - `WEBADMIN_COLLECTION` (`sysreset`)
-   - `JWT_SECRET`
-   - `ADMIN_USERNAME`
-   - `ADMIN_PASSWORD`
-   - `CRON_SECRET`
-   - `telegram_bot` (Your Telegram Bot Token)
-5. Click **Deploy Site**!
+4. Set your environment variables in Netlify: **Site Settings > Environment Variables**:
+   - `MONGO_URI`, `MONGO_DB_NAME`, `WEBADMIN_COLLECTION`
+   - `postgresql_url`, `postgresql_db` (optional)
+   - `mysql_url`, `mysql_db` (optional)
+   - `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`
+   - `CRON_SECRET`, `telegram_bot`
+5. Netlify's scheduled cron runs `scheduled-ping.js` every 5 minutes automatically.
 
 ---
 
-## 🔒 Security & Privacy
+## 🤖 Telegram Bot Remote Controls
 
-- **Zero Client-Side Secrets**: `MONGO_URI`, `JWT_SECRET`, and `telegram_bot` are strictly server-side and never leaked in client bundles.
-- **Masked Connection Strings**: The API masks credentials (`mongodb+srv://user:••••••••@cluster0...`).
-- **Salted Bcrypt Hashing**: Passwords stored using salted bcrypt hashes.
-- **Authorization Gate**: Unauthorized Telegram users cannot execute database commands or view database names.
-- **Connection Isolation**: Queries run exclusively against system logs and ping status, leaving business collections (`sysreset`) untouched.
+The bot includes full Telegram integration for mobile notifications and controls:
+
+### Commands & Touch Buttons
+- **`🍃 Cluster Status`** (`/status`): View real-time database latency and status.
+- **`⚡ Instant Ping`** (`/ping`): Force an immediate keep-alive ping cycle across all active databases.
+- **`🆔 My ID`** (`/id`): Display your Telegram Chat ID and User ID.
+
+### Admin Approval Workflow
+1. When a new person contacts your bot, they are greeted in **Pending Approval** mode.
+2. In the **Telegram Bot** tab of your dashboard, their profile appears in the **Detected Users** list.
+3. Click **Allow Access** to approve them, or **Revoke Access** to block them.
+4. Admins can ban unauthorized or abusive users directly from the dashboard.
+
+---
+
+## 🔐 Security Protections
+
+- **No Client-Side Secrets**: All database URLs and passwords remain strictly on the backend. Vite never bundles `.env` variables without the `VITE_` prefix.
+- **Masked Database URIs**: API responses mask credentials (`mongodb+srv://••••••••:••••••••@cluster...`).
+- **NoSQL Injection Guard**: Strict type checks prevent query selector injection on authentication endpoints.
+- **Protected Cron Webhooks**: External ping triggers require a secret key (`?key=CRON_SECRET`).
+- **Sanitized Error Responses**: Internal database errors, connection strings, and stack traces are suppressed in API responses.
+
+---
+
+## 📜 Available NPM Scripts
+
+| Command | Description |
+| :--- | :--- |
+| `npm run dev` | Starts Vite dev server with hot reload and Netlify function emulator. |
+| `npm run build` | Compiles production frontend bundle to `dist/`. |
+| `npm start` | Runs standalone lightweight Node.js server with built-in 5-min scheduler. |
+| `npm run test:db` | Tests live connections to MongoDB, PostgreSQL, and MySQL. |
+| `npm run test:fn` | Tests all 6 backend serverless functions locally. |
+| `npm run seed` | Seeds initial admin user credentials into MongoDB. |
 
 ---
 
 <div align="center">
-  <p>Built with ❤️ for high-reliability MongoDB Atlas workloads.</p>
+  <p>Built for reliable, worry-free database keep-alive management on Raspberry Pi and Cloud.</p>
 </div>

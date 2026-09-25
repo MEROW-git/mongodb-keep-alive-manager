@@ -5,9 +5,35 @@ const url = require('url');
 
 // Local Vite dev middleware to emulate Netlify functions during "npm run dev"
 function netlifyFunctionsDevPlugin() {
+  let telegramPollTimer = null;
+
   return {
     name: 'netlify-functions-dev',
     configureServer(server) {
+      // Start background Telegram poller for live local bot replies
+      const startTelegramPoller = () => {
+        if (telegramPollTimer) return;
+        telegramPollTimer = setInterval(async () => {
+          try {
+            const { connectToDatabase } = require('./netlify/functions/lib/mongodb');
+            const { syncTelegramUpdates } = require('./netlify/functions/telegram');
+            const { db } = await connectToDatabase();
+            await syncTelegramUpdates(db);
+          } catch (e) {
+            // ignore background poller errors
+          }
+        }, 3000);
+      };
+
+      startTelegramPoller();
+
+      server.httpServer?.on('close', () => {
+        if (telegramPollTimer) {
+          clearInterval(telegramPollTimer);
+          telegramPollTimer = null;
+        }
+      });
+
       server.middlewares.use(async (req, res, next) => {
         const parsedUrl = url.parse(req.url, true);
         const pathname = parsedUrl.pathname;

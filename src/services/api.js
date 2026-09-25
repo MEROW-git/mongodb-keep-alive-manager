@@ -185,6 +185,13 @@ export const api = {
       }),
     });
   },
+
+  async syncTelegramUpdates() {
+    return request('/telegram', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'sync_updates' }),
+    });
+  },
 };
 
 export default api;

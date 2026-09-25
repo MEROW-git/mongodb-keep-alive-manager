@@ -149,12 +149,10 @@ async function processTelegramMessage(db, message) {
     if (text.startsWith('/start') || text.startsWith('/help')) {
       const warmWelcomeText =
         `✨ <b>Hello, ${escapeHtml(firstName || displayName)}! Warm welcome!</b> 🐱👋\n\n` +
-        `I am your <b>MongoDB Keep-Alive Assistant</b> for database <code>${dbName}</code>.\n\n` +
-        `⏳ <b>Status: Pending Administrator Approval</b>\n` +
-        `• <b>Your Telegram User ID:</b> <code>${userId}</code>\n` +
-        `• <b>Your Chat ID:</b> <code>${chatId}</code>\n\n` +
-        `🔒 <i>To keep your database secure, new users must be authorized by an administrator in the Keep-Alive Dashboard before commands or interactive buttons are unlocked.</i>\n\n` +
-        `Your message has been detected and is visible in the dashboard. Once the administrator clicks <b>"Allow Access"</b>, you will receive an automatic confirmation with your control buttons!`;
+        `I am your <b>MongoDB Keep-Alive Assistant</b>.\n\n` +
+        `⏳ <b>Access Status: Pending Administrator Approval</b>\n\n` +
+        `🔒 <i>To protect database resources and keep monitoring secure, all new users must be authorized by an administrator in the Keep-Alive Dashboard before access is granted.</i>\n\n` +
+        `Your connection has been detected. Once the administrator approves your access, you will receive full cluster details, your account identity, and your interactive control buttons!`;
 
       await sendSafeTelegramMessage(chatId, warmWelcomeText);
       return { status: 'pending_approval_welcome', userId };
@@ -163,8 +161,8 @@ async function processTelegramMessage(db, message) {
     // Any other text or command while unauthorized
     const pendingNotice =
       `🔒 <b>Authorization Required</b>\n\n` +
-      `Hello ${escapeHtml(firstName || displayName)}! Your account (ID: <code>${userId}</code>) is waiting for administrator approval in the Keep-Alive Dashboard.\n\n` +
-      `Please ask your dashboard administrator to click <b>"Allow Access"</b> for your user.`;
+      `Hello ${escapeHtml(firstName || displayName)}! Your account is currently waiting for administrator approval in the Keep-Alive Dashboard.\n\n` +
+      `Please ask the dashboard administrator to click <b>"Allow Access"</b> for your user.`;
 
     await sendSafeTelegramMessage(chatId, pendingNotice);
     return { status: 'unauthorized', userId };
@@ -464,14 +462,21 @@ exports.handler = async (event, context) => {
         const targetName = targetUser?.firstName || targetUser?.displayName || cleanUserId;
 
         if (isAllow) {
+          const dbName = process.env.MONGO_DB_NAME || 'system_reset';
           const approvalText =
-            `🎉 <b>Authorization Approved!</b> 🐱🚀\n\n` +
+            `🎉 <b>Authorization Approved! Full Access Granted!</b> 🐱🚀\n\n` +
             `Hello <b>${escapeHtml(targetName)}</b>! The administrator has <b>approved your account</b> for the MongoDB Keep-Alive Assistant!\n\n` +
-            `⚡ <b>Commands &amp; Buttons Unlocked:</b>\n` +
+            `📋 <b>Your Access Details:</b>\n` +
+            `• <b>Target Database:</b> <code>${dbName}</code>\n` +
+            `• <b>Your Telegram User ID:</b> <code>${cleanUserId}</code>\n` +
+            `• <b>Your Chat ID:</b> <code>${targetChatId}</code>\n` +
+            `• <b>Status:</b> 🟢 <b>Active &amp; Authorized</b>\n` +
+            `• <b>Auto-Ping Alerts:</b> Subscribed 🔔\n\n` +
+            `⚡ <b>Commands &amp; Interactive Buttons:</b>\n` +
             `• Tap <b>🟢 Cluster Status</b> to inspect database latency\n` +
             `• Tap <b>⚡ Instant Ping</b> to verify connection &amp; keep alive\n` +
             `• Tap <b>🆔 My ID</b> to view your Chat ID\n\n` +
-            `🔔 <i>You will now receive automatic notifications whenever the database is pinged successfully!</i>`;
+            `✨ <i>You will now receive automatic notifications whenever the database is pinged successfully!</i>`;
 
           await sendSafeTelegramMessage(targetChatId, approvalText, {
             reply_markup: AUTHORIZED_KEYBOARD,

@@ -1,17 +1,19 @@
-﻿const { Pool } = require('pg');
+const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 let cachedPool = null;
 
 function isPostgresConfigured() {
+  require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), override: true });
   const url = process.env.postgresql_url || process.env.POSTGRESQL_URL;
   return Boolean(url && url.trim());
 }
 
 function getSslConfig(isLocal) {
   if (isLocal) return false;
+
+  require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), override: true });
 
   const caPath = process.env.PG_SSL_CA_PATH || process.env.DB_SSL_CA_PATH;
   const caCert = process.env.PG_SSL_CA_CERT || process.env.DB_SSL_CA_CERT;
@@ -29,7 +31,7 @@ function getSslConfig(isLocal) {
   }
 
   // If CA is provided, strictly enforce verification (true).
-  // Otherwise, allow user to set DB_SSL_REJECT_UNAUTHORIZED=true or default with explicit notice.
+  // Otherwise, respect DB_SSL_REJECT_UNAUTHORIZED if explicitly provided.
   const rejectUnauthorized = ca ? true : (rejectUnauthorizedEnv === 'true');
 
   if (!rejectUnauthorized) {
@@ -72,6 +74,9 @@ function getPostgresPool() {
 
   cachedPool.on('error', (err) => {
     console.warn('Unexpected idle PostgreSQL client error:', err.message);
+    if (err.message && err.message.includes('certificate')) {
+      cachedPool = null; // Recreate pool on next ping
+    }
   });
 
   return cachedPool;
@@ -90,10 +95,17 @@ async function pingPostgres() {
   }
 
   const dbName = process.env.postgresql_db || process.env.POSTGRESQL_DB || 'postgresql';
-  const pool = getPostgresPool();
-
-  const client = await pool.connect();
+  let pool;
   try {
+    pool = getPostgresPool();
+  } catch (err) {
+    cachedPool = null;
+    throw err;
+  }
+
+  let client;
+  try {
+    client = await pool.connect();
     const pingStart = Date.now();
     const result = await client.query('SELECT NOW() as current_time, current_database() as current_db, 1 as alive;');
     const responseTimeMs = Date.now() - pingStart;
@@ -106,8 +118,13 @@ async function pingPostgres() {
       responseTime: responseTimeMs,
       timestamp: row.current_time || new Date().toISOString(),
     };
+  } catch (err) {
+    if (err.message && err.message.includes('certificate')) {
+      cachedPool = null; // Invalidate pool so it recreates with updated SSL settings
+    }
+    throw err;
   } finally {
-    client.release();
+    if (client) client.release();
   }
 }
 

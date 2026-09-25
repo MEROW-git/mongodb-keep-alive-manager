@@ -1,17 +1,19 @@
-﻿const mysql = require('mysql2/promise');
+const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 let cachedPool = null;
 
 function isMysqlConfigured() {
+  require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), override: true });
   const url = process.env.mysql_url || process.env.MYSQL_URL || process.env.MYSQL_URI;
   return Boolean(url && url.trim());
 }
 
 function getSslConfig(isLocal) {
   if (isLocal) return undefined;
+
+  require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), override: true });
 
   const caPath = process.env.MYSQL_SSL_CA_PATH || process.env.DB_SSL_CA_PATH;
   const caCert = process.env.MYSQL_SSL_CA_CERT || process.env.DB_SSL_CA_CERT;
@@ -88,21 +90,35 @@ async function pingMysql() {
   }
 
   const defaultDbName = process.env.mysql_db || process.env.MYSQL_DB || 'mysql';
-  const pool = getMysqlPool();
+  let pool;
+  try {
+    pool = getMysqlPool();
+  } catch (err) {
+    cachedPool = null;
+    throw err;
+  }
+
   const pingStart = Date.now();
 
-  // Use non-reserved alias ping_time (current_time is a reserved keyword in MySQL)
-  const [rows] = await pool.query('SELECT NOW() AS ping_time, DATABASE() AS ping_db, 1 AS alive;');
-  const responseTimeMs = Date.now() - pingStart;
+  try {
+    // Use non-reserved alias ping_time (current_time is a reserved keyword in MySQL)
+    const [rows] = await pool.query('SELECT NOW() AS ping_time, DATABASE() AS ping_db, 1 AS alive;');
+    const responseTimeMs = Date.now() - pingStart;
 
-  const row = rows && rows[0] ? rows[0] : {};
-  return {
-    configured: true,
-    status: 'SUCCESS',
-    database: row.ping_db || defaultDbName,
-    responseTime: responseTimeMs,
-    timestamp: row.ping_time || new Date().toISOString(),
-  };
+    const row = rows && rows[0] ? rows[0] : {};
+    return {
+      configured: true,
+      status: 'SUCCESS',
+      database: row.ping_db || defaultDbName,
+      responseTime: responseTimeMs,
+      timestamp: row.ping_time || new Date().toISOString(),
+    };
+  } catch (err) {
+    if (err.message && err.message.includes('certificate')) {
+      cachedPool = null; // Recreate pool on next ping with updated SSL config
+    }
+    throw err;
+  }
 }
 
 module.exports = {

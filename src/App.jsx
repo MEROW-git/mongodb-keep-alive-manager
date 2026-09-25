@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { CheckCircle2, AlertCircle, X, Zap } from 'lucide-react';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
@@ -17,9 +18,13 @@ export default function App() {
   const [notification, setNotification] = useState(null);
 
   // Show temporary toast notification
-  const showNotification = (message, type = 'success') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 4000);
+  const showNotification = (payload, type = 'success') => {
+    if (typeof payload === 'string') {
+      setNotification({ title: 'Notification', message: payload, type });
+    } else {
+      setNotification({ ...payload, type: payload.type || type });
+    }
+    setTimeout(() => setNotification(null), 5000);
   };
 
   // Fetch dashboard statistics
@@ -76,15 +81,23 @@ export default function App() {
     return () => clearInterval(autoPingTimer);
   }, [token, dashboardData?.automation?.enabled, dashboardData?.automation?.interval, loadDashboard]);
 
-  // Manual Trigger Ping
+  // Trigger Ping (both automated from countdown & manual button)
   const handleTriggerPing = async () => {
     setIsPinging(true);
     try {
       const res = await api.triggerPing();
-      showNotification(`Ping completed in ${res.responseTime}! Database is active.`, 'success');
+      showNotification({
+        title: 'Ping Successful',
+        message: `Atlas Keep-Alive executed (${res.responseTime}) • Database active`,
+        type: 'success',
+      });
       await loadDashboard(true);
     } catch (err) {
-      showNotification(err.message || 'Ping failed.', 'error');
+      showNotification({
+        title: 'Ping Failed',
+        message: err.message || 'Database connection error.',
+        type: 'error',
+      });
     } finally {
       setIsPinging(false);
     }
@@ -94,13 +107,18 @@ export default function App() {
   const handleToggleAutomation = async (newEnabledState) => {
     try {
       await api.updateSettings({ enabled: newEnabledState });
-      showNotification(
-        newEnabledState ? 'Keep Alive Bot ENABLED' : 'Keep Alive Bot DISABLED',
-        'success'
-      );
+      showNotification({
+        title: 'Automation Updated',
+        message: newEnabledState ? 'Keep Alive Bot is now ENABLED' : 'Keep Alive Bot is now DISABLED',
+        type: 'success',
+      });
       await loadDashboard(true);
     } catch (err) {
-      showNotification('Failed to toggle automation: ' + err.message, 'error');
+      showNotification({
+        title: 'Settings Error',
+        message: 'Failed to toggle automation: ' + err.message,
+        type: 'error',
+      });
     }
   };
 
@@ -138,18 +156,46 @@ export default function App() {
         isMobileMenuOpen={isMobileMenuOpen}
       />
 
-      {/* Toast Notification Banner */}
+      {/* Eye-Level Top-Right Toast Notification Banner */}
       {notification && (
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className="fixed top-20 right-4 sm:right-8 z-50 max-w-sm w-full transition-all duration-300">
           <div
-            className={`px-4 py-3 rounded-xl border shadow-2xl flex items-center space-x-2 text-xs font-semibold backdrop-blur-lg ${
+            className={`p-4 rounded-2xl border shadow-2xl backdrop-blur-2xl flex items-start space-x-3.5 ${
               notification.type === 'success'
-                ? 'bg-cardBg/95 border-mongo/40 text-mongo shadow-[0_0_20px_rgba(0,237,100,0.2)]'
-                : 'bg-cardBg/95 border-red-500/40 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.2)]'
+                ? 'bg-[#111827]/95 border-mongo/60 text-white shadow-[0_0_30px_rgba(0,237,100,0.25)]'
+                : 'bg-[#111827]/95 border-red-500/60 text-white shadow-[0_0_30px_rgba(239,68,68,0.25)]'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
-            <span>{notification.message}</span>
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                notification.type === 'success'
+                  ? 'bg-mongo/15 text-mongo border border-mongo/30'
+                  : 'bg-red-500/15 text-red-400 border border-red-500/30'
+              }`}
+            >
+              {notification.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 text-mongo" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-red-400" />
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0 pt-0.5">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-mongo font-mono">
+                  {notification.title || 'Notification'}
+                </h4>
+                <button
+                  onClick={() => setNotification(null)}
+                  className="text-gray-400 hover:text-white transition p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-200 mt-1 font-medium leading-relaxed">
+                {notification.message}
+              </p>
+            </div>
           </div>
         </div>
       )}

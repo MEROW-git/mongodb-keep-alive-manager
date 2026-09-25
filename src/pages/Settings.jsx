@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sliders, Save, Database, ShieldCheck, CheckCircle2, AlertCircle, Copy, Check } from 'lucide-react';
 import api from '../services/api';
 
-export default function Settings() {
+export default function Settings({ onSettingsUpdated }) {
   const [enabled, setEnabled] = useState(true);
   const [intervalVal, setIntervalVal] = useState(5);
   const [databaseInfo, setDatabaseInfo] = useState({});
@@ -38,11 +38,14 @@ export default function Settings() {
     setMessage({ text: '', type: '' });
 
     try {
-      await api.updateSettings({
+      const res = await api.updateSettings({
         enabled,
         interval: parseInt(intervalVal, 10),
       });
       setMessage({ text: 'Settings updated successfully!', type: 'success' });
+      if (onSettingsUpdated) {
+        onSettingsUpdated(res.settings);
+      }
       setTimeout(() => setMessage({ text: '', type: '' }), 4000);
     } catch (err) {
       setMessage({ text: err.message || 'Failed to update settings', type: 'error' });

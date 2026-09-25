@@ -104,6 +104,17 @@ export default function App() {
     }
   };
 
+  const handleTabChange = (newTab) => {
+    setCurrentTab(newTab);
+    if (newTab === 'dashboard') {
+      loadDashboard(true);
+    }
+  };
+
+  const handleSettingsUpdated = () => {
+    loadDashboard(true);
+  };
+
   if (!token) {
     return (
       <Login
@@ -148,7 +159,7 @@ export default function App() {
         {/* Sidebar */}
         <Sidebar
           currentTab={currentTab}
-          setTab={setCurrentTab}
+          setTab={handleTabChange}
           isMobileOpen={isMobileMenuOpen}
           closeMobile={() => setIsMobileMenuOpen(false)}
           dbInfo={dashboardData?.database}
@@ -169,7 +180,9 @@ export default function App() {
 
           {currentTab === 'logs' && <Logs />}
 
-          {currentTab === 'settings' && <Settings />}
+          {currentTab === 'settings' && (
+            <Settings onSettingsUpdated={handleSettingsUpdated} />
+          )}
         </main>
       </div>
 

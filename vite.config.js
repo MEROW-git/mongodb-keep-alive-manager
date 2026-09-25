@@ -3,14 +3,26 @@ const react = require('@vitejs/plugin-react');
 const path = require('path');
 const url = require('url');
 
-// Local Vite dev middleware to emulate Netlify functions during "npm run dev"
+// Local Vite dev middleware to emulate Netlify functions and autonomous scheduler during "npm run dev"
 function netlifyFunctionsDevPlugin() {
   let telegramPollTimer = null;
 
   return {
     name: 'netlify-functions-dev',
     configureServer(server) {
-      // Start background Telegram poller for live local bot replies
+      // 1. Start autonomous 24/7 background keep-alive scheduler (independent of open browser tabs)
+      try {
+        const { startAutonomousScheduler, stopAutonomousScheduler } = require('./netlify/functions/lib/scheduler');
+        startAutonomousScheduler(15000);
+
+        server.httpServer?.on('close', () => {
+          stopAutonomousScheduler();
+        });
+      } catch (e) {
+        console.error('Failed to initialize local dev keep-alive scheduler:', e.message);
+      }
+
+      // 2. Start background Telegram poller for live local bot replies
       const startTelegramPoller = () => {
         if (telegramPollTimer) return;
         telegramPollTimer = setInterval(async () => {
@@ -34,9 +46,19 @@ function netlifyFunctionsDevPlugin() {
         }
       });
 
+      // 3. API Route Handler for Netlify Serverless Functions emulation
       server.middlewares.use(async (req, res, next) => {
-        const parsedUrl = url.parse(req.url, true);
-        const pathname = parsedUrl.pathname;
+        let parsedUrl;
+        try {
+          parsedUrl = url.parse(req.url, true);
+        } catch {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'error', message: 'Bad Request: Malformed URI' }));
+          return;
+        }
+
+        const pathname = parsedUrl.pathname || '';
 
         let functionName = null;
         if (pathname.startsWith('/.netlify/functions/')) {
@@ -86,7 +108,7 @@ function netlifyFunctionsDevPlugin() {
               console.error('Function execution error:', err);
               res.statusCode = 500;
               res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ status: 'error', message: err.message }));
+              res.end(JSON.stringify({ status: 'error', message: 'Internal Server Error' }));
             }
           });
         } catch (err) {

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Server,
   Activity,
@@ -105,17 +105,22 @@ export default function Dashboard({
       const diffMs = nextPingTime - now;
 
       if (diffMs <= 0) {
-        setCountdownText('Pinging...');
+        setCountdownText('Syncing...');
         if (progressBarRef.current) progressBarRef.current.style.width = '0%';
 
-        // Auto-trigger keep-alive ping when countdown reaches 00:00!
-        if (!isAutoPingingRef.current && onTriggerPing && !isPinging) {
+        // Sync fresh keep-alive statistics from autonomous backend scheduler
+        if (!isAutoPingingRef.current) {
           isAutoPingingRef.current = true;
-          onTriggerPing().finally(() => {
-            setTimeout(() => {
-              isAutoPingingRef.current = false;
-            }, 2000);
-          });
+          if (diffMs < -15000 && onTriggerPing && !isPinging) {
+            // Fallback manual trigger if backend was delayed
+            onTriggerPing().finally(() => {
+              setTimeout(() => { isAutoPingingRef.current = false; }, 4000);
+            });
+          } else if (onRefresh) {
+            onRefresh().finally(() => {
+              setTimeout(() => { isAutoPingingRef.current = false; }, 4000);
+            });
+          }
         }
       } else {
         isAutoPingingRef.current = false;

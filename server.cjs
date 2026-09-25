@@ -1,4 +1,4 @@
-﻿const http = require('http');
+const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
@@ -44,29 +44,10 @@ function getFunctionHandler(functionName) {
   return mod.handler;
 }
 
-// Background Keep-Alive Scheduler (Automated every 5 minutes in memory)
+// Background Keep-Alive Scheduler (Autonomous, dynamically reading interval from settings)
+const { startAutonomousScheduler } = require('./netlify/functions/lib/scheduler');
 function startKeepAliveScheduler() {
-  const { scheduledPingHandler } = require('./netlify/functions/scheduled-ping');
-  const INTERVAL_MS = 5 * 60 * 1000;
-
-  console.log('⏰ Keep-Alive Scheduler initialized (running every 5 minutes)');
-
-  // Initial trigger after 10 seconds
-  setTimeout(async () => {
-    try {
-      await scheduledPingHandler({}, { clientContext: { custom: { scheduled: true } } });
-    } catch (e) {
-      console.error('Scheduled keep-alive run error:', e.message);
-    }
-  }, 10000);
-
-  setInterval(async () => {
-    try {
-      await scheduledPingHandler({}, { clientContext: { custom: { scheduled: true } } });
-    } catch (e) {
-      console.error('Scheduled keep-alive run error:', e.message);
-    }
-  }, INTERVAL_MS);
+  startAutonomousScheduler(15000);
 }
 
 // Background Telegram Poller

@@ -18,9 +18,10 @@ import { Activity, PieChart as PieIcon, BarChart3 } from 'lucide-react';
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
+    const fullTime = payload[0]?.payload?.fullTime;
     return (
       <div className="bg-[#111827] border border-gray-700/80 p-2.5 rounded-xl shadow-2xl text-xs font-mono">
-        <p className="text-gray-400 mb-1">{label}</p>
+        <p className="text-gray-400 mb-1">{fullTime || label}</p>
         {payload.map((entry, index) => (
           <p key={index} className="font-semibold" style={{ color: entry.color || '#00ED64' }}>
             {entry.name}: {entry.value} {entry.dataKey === 'latency' ? 'ms' : ''}

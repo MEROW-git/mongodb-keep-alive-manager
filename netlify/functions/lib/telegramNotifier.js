@@ -90,7 +90,8 @@ async function notifyPingSuccess({ latencyMs, dbName = 'system_reset', source = 
     }
 
     const timeStr = new Date().toLocaleTimeString('en-US', {
-      hour: '2-digit',
+      hour12: true,
+      hour: 'numeric',
       minute: '2-digit',
       second: '2-digit',
     });

@@ -67,6 +67,7 @@ exports.handler = async (event, context) => {
         formattedTime: new Date(log.createdAt).toLocaleString('en-US', {
           dateStyle: 'medium',
           timeStyle: 'medium',
+          hour12: true,
         }),
       }));
 

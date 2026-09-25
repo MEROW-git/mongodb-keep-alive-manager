@@ -38,6 +38,39 @@ export default function Dashboard({
   const isAutoPingingRef = useRef(false);
   const [countdownText, setCountdownText] = useState('--:--');
 
+  // Format 12-hour time with AM/PM
+  const formatTime12h = (dateInput, fallback = '--:--:--') => {
+    if (!dateInput) return fallback;
+    try {
+      const d = new Date(dateInput);
+      if (isNaN(d.getTime())) return fallback;
+      return d.toLocaleTimeString('en-US', {
+        hour12: true,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    } catch {
+      return fallback;
+    }
+  };
+
+  const nextScheduledDisplay = React.useMemo(() => {
+    if (!automation.enabled) return 'Paused';
+    if (!stats.lastPingFull) return automation.nextScheduledPing || '--:--';
+    try {
+      const intervalMs = (automation.interval || 5) * 60 * 1000;
+      const nextTime = new Date(new Date(stats.lastPingFull).getTime() + intervalMs);
+      return nextTime.toLocaleTimeString('en-US', {
+        hour12: true,
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+    } catch {
+      return automation.nextScheduledPing || '--:--';
+    }
+  }, [stats.lastPingFull, automation.enabled, automation.interval, automation.nextScheduledPing]);
+
   useEffect(() => {
     if (!automation.enabled) {
       setCountdownText('PAUSED');
@@ -160,7 +193,7 @@ export default function Dashboard({
         />
         <StatusCard
           title="Last Ping"
-          value={stats.lastPing || '--:--:--'}
+          value={formatTime12h(stats.lastPingFull, stats.lastPing)}
           subtitle="Keep-alive verified"
           icon={Clock}
           color="blue"
@@ -233,7 +266,7 @@ export default function Dashboard({
                     </div>
                   </div>
                   <div className="text-[10px] text-gray-400 font-mono mt-2">
-                    At {automation.nextScheduledPing || '--:--'}
+                    At {nextScheduledDisplay}
                   </div>
                 </div>
 
@@ -351,7 +384,15 @@ export default function Dashboard({
                             {activity.message}
                           </div>
                           <div className="flex items-center space-x-2 text-[10px] font-mono text-gray-400 mt-0.5">
-                            <span>{activity.time}</span>
+                            <span>
+                              {activity.fullTimestamp
+                                ? new Date(activity.fullTimestamp).toLocaleTimeString('en-US', {
+                                    hour12: true,
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                  })
+                                : activity.time}
+                            </span>
                             <span>•</span>
                             <span className={isSuccess ? 'text-mongo font-semibold' : 'text-red-400 font-semibold'}>
                               {activity.status}

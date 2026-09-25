@@ -59,7 +59,7 @@ exports.handler = async (event, context) => {
     if (latestLog && latestLog.createdAt) {
       lastPingDate = new Date(latestLog.createdAt);
       lastPingFormatted = lastPingDate.toLocaleTimeString('en-US', {
-        hour12: false,
+        hour12: true,
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
@@ -69,8 +69,8 @@ exports.handler = async (event, context) => {
         const intervalMs = (settings.interval || 5) * 60 * 1000;
         const nextPingDate = new Date(lastPingDate.getTime() + intervalMs);
         nextScheduledPingFormatted = nextPingDate.toLocaleTimeString('en-US', {
-          hour12: false,
-          hour: '2-digit',
+          hour12: true,
+          hour: 'numeric',
           minute: '2-digit',
         });
       }
@@ -80,14 +80,15 @@ exports.handler = async (event, context) => {
     const latencyHistory = recentPingsForChart
       .reverse()
       .map((item) => ({
+        createdAt: item.createdAt,
         time: new Date(item.createdAt).toLocaleTimeString('en-US', {
-          hour12: false,
-          hour: '2-digit',
+          hour12: true,
+          hour: 'numeric',
           minute: '2-digit',
         }),
         fullTime: new Date(item.createdAt).toLocaleTimeString('en-US', {
-          hour12: false,
-          hour: '2-digit',
+          hour12: true,
+          hour: 'numeric',
           minute: '2-digit',
           second: '2-digit',
         }),
@@ -144,8 +145,8 @@ exports.handler = async (event, context) => {
       return {
         id: log._id.toString(),
         time: date.toLocaleTimeString('en-US', {
-          hour12: false,
-          hour: '2-digit',
+          hour12: true,
+          hour: 'numeric',
           minute: '2-digit',
         }),
         fullTimestamp: date.toISOString(),

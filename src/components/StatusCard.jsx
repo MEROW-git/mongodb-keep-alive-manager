@@ -47,9 +47,20 @@ export default function StatusCard({ title, value, subtitle, icon: Icon, color =
       </div>
 
       <div className="flex items-baseline space-x-2">
-        <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-mono">
-          {value}
-        </span>
+        {typeof value === 'string' && (value.endsWith(' AM') || value.endsWith(' PM')) ? (
+          <div className="flex items-baseline space-x-1.5 whitespace-nowrap">
+            <span className="text-xl sm:text-2xl lg:text-[22px] xl:text-3xl font-extrabold text-white tracking-tight font-mono">
+              {value.slice(0, -3)}
+            </span>
+            <span className={`text-xs sm:text-sm font-bold font-mono tracking-wider uppercase ${scheme.text}`}>
+              {value.slice(-2)}
+            </span>
+          </div>
+        ) : (
+          <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-mono">
+            {value}
+          </span>
+        )}
         {pulse && (
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-mongo opacity-75"></span>

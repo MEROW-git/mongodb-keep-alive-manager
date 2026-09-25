@@ -209,7 +209,8 @@ async function processTelegramMessage(db, message) {
     const latency = Date.now() - pingStart;
 
     const timeStr = new Date().toLocaleTimeString('en-US', {
-      hour: '2-digit',
+      hour12: true,
+      hour: 'numeric',
       minute: '2-digit',
       second: '2-digit',
     });
@@ -399,7 +400,14 @@ exports.handler = async (event, context) => {
         displayName: m.displayName,
         text: m.text,
         isCommand: !!m.isCommand,
-        time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString('en-US') : 'N/A',
+        time: m.createdAt
+          ? new Date(m.createdAt).toLocaleTimeString('en-US', {
+              hour12: true,
+              hour: 'numeric',
+              minute: '2-digit',
+              second: '2-digit',
+            })
+          : 'N/A',
         date: m.createdAt ? new Date(m.createdAt).toLocaleDateString('en-US') : 'N/A',
       }));
 

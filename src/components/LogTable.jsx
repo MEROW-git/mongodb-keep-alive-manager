@@ -90,7 +90,15 @@ export default function LogTable({
                     <td className="py-3 px-4 sm:px-6 text-gray-300 whitespace-nowrap">
                       <div className="flex items-center space-x-1.5">
                         <Clock className="w-3.5 h-3.5 text-gray-500" />
-                        <span>{log.formattedTime || log.timestamp}</span>
+                        <span>
+                          {log.timestamp
+                            ? new Date(log.timestamp).toLocaleString('en-US', {
+                                dateStyle: 'medium',
+                                timeStyle: 'medium',
+                                hour12: true,
+                              })
+                            : (log.formattedTime || '-')}
+                        </span>
                       </div>
                     </td>
                     <td className="py-3 px-4 text-white font-semibold">

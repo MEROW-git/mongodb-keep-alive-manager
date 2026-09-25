@@ -266,10 +266,19 @@ This can be queried by local monitoring tools, uptime daemons, or router scripts
 
 The bot includes full Telegram integration for mobile notifications and controls:
 
-### Commands & Touch Buttons
-- **`🍃 Cluster Status`** (`/status`): View real-time database latency and status.
-- **`⚡ Instant Ping`** (`/ping`): Force an immediate keep-alive ping cycle across all active databases.
-- **`🆔 My ID`** (`/id`): Display your Telegram Chat ID and User ID.
+### Commands & Multi-Database Touch Buttons
+
+The Telegram bot provides an interactive on-screen touch keyboard customized for all 3 databases:
+
+| Touch Button | Command | Description |
+| :--- | :--- | :--- |
+| **`📊 All DBs Status`** | `/status`, `/all` | Live latency and operational status summary across all 3 active databases. |
+| **`⚡ Instant Multi-Ping`** | `/ping`, `/multiping` | Immediately triggers keep-alive pings on MongoDB, PostgreSQL, and MySQL simultaneously, recording cycles to Dashboard logs. |
+| **`🍃 MongoDB`** | `/mongo`, `/mongodb` | Dedicated status check for MongoDB Atlas (latency, database name, target collection). |
+| **`🐘 PostgreSQL`** | `/postgres` | Dedicated status check for PostgreSQL (connection pool, latency, strict TLS verification). |
+| **`🐬 MySQL`** | `/mysql` | Dedicated status check for MySQL (connection pool, latency, strict TLS verification). |
+| **`🆔 My ID`** | `/id` | Displays your Telegram Chat ID, User ID, and authorization status. |
+| **`❓ Help`** | `/help` | Displays the interactive guide and list of available database actions. |
 
 ### Admin Approval Workflow
 1. When a new person contacts your bot, they are greeted in **Pending Approval** mode.

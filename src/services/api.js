@@ -136,6 +136,55 @@ export const api = {
       body: JSON.stringify(settingsData),
     });
   },
+
+  // Telegram Bot
+  async getTelegramData() {
+    return request('/telegram', { method: 'GET' });
+  },
+
+  async sendTelegramNotification({ chatId, message, parseMode = 'Markdown' }) {
+    return request('/telegram', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'send_notification',
+        chatId,
+        message,
+        parseMode,
+      }),
+    });
+  },
+
+  async banTelegramUser({ userId, username, reason }) {
+    return request('/telegram', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'ban_user',
+        userId,
+        username,
+        reason,
+      }),
+    });
+  },
+
+  async unbanTelegramUser(userId) {
+    return request('/telegram', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'unban_user',
+        userId,
+      }),
+    });
+  },
+
+  async updateTelegramSettings(settings) {
+    return request('/telegram', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'update_settings',
+        ...settings,
+      }),
+    });
+  },
 };
 
 export default api;

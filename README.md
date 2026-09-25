@@ -45,6 +45,7 @@
 | **External Webhook Trigger** | Secured HTTP GET/POST with token | Trigger pings from UptimeRobot, cron-job.org, or GitHub Actions. |
 | **Real-time Analytics** | Recharts Area, Donut, and Bar charts | Visualizes latency trends, success ratios, and 7-day activity volume. |
 | **Bcrypt & JWT Auth** | Salted password hashing & 7-day tokens | Secure, stateless authentication. Never stores or exposes raw passwords. |
+| **Telegram Bot Control** | `@meow_db_notification_bot` API | Send notifications, alert on failure, and ban restricted users. |
 | **Safe Database Isolation** | Preserves existing collections | Target collections (like `sysreset`) remain untouched while telemetry logs separately. |
 
 ---

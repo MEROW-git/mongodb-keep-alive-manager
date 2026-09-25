@@ -1,11 +1,12 @@
 import React from 'react';
-import { LayoutDashboard, FileText, Sliders, Server, ShieldCheck, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, FileText, Sliders, Server, ShieldCheck, ExternalLink, Bot } from 'lucide-react';
 
 export default function Sidebar({ currentTab, setTab, isMobileOpen, closeMobile, dbInfo }) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'logs', label: 'Activity Logs', icon: FileText },
     { id: 'settings', label: 'Automation Settings', icon: Sliders },
+    { id: 'telegram', label: 'Telegram Bot', icon: Bot, badge: 'Active' },
   ];
 
   const content = (
@@ -26,14 +27,21 @@ export default function Sidebar({ currentTab, setTab, isMobileOpen, closeMobile,
                   setTab(item.id);
                   if (closeMobile) closeMobile();
                 }}
-                className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   active
                     ? 'bg-mongo/10 text-mongo border border-mongo/30 shadow-[0_0_12px_rgba(0,237,100,0.1)]'
                     : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${active ? 'text-mongo' : 'text-gray-400'}`} />
-                <span>{item.label}</span>
+                <div className="flex items-center space-x-3">
+                  <Icon className={`w-4 h-4 ${active ? 'text-mongo' : 'text-gray-400'}`} />
+                  <span>{item.label}</span>
+                </div>
+                {item.badge && (
+                  <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                    {item.badge}
+                  </span>
+                )}
               </button>
             );
           })}

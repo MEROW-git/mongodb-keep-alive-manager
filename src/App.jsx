@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Logs from './pages/Logs';
 import Settings from './pages/Settings';
+import TelegramBot from './pages/TelegramBot';
 import Login from './pages/Login';
 import api, { getToken, clearAuthSession } from './services/api';
 
@@ -229,6 +230,8 @@ export default function App() {
           {currentTab === 'settings' && (
             <Settings onSettingsUpdated={handleSettingsUpdated} />
           )}
+
+          {currentTab === 'telegram' && <TelegramBot />}
         </main>
       </div>
 

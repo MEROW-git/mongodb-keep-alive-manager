@@ -359,22 +359,20 @@ export default function TelegramBot() {
           </button>
         </div>
 
-        <div className="rounded-xl border border-gray-800 overflow-x-auto">
-          <table className="w-full text-left text-xs min-w-[760px]">
+        <div className="rounded-xl border border-gray-800 overflow-hidden">
+          <table className="w-full text-left text-xs">
             <thead className="bg-[#0B1120] text-gray-400 font-mono text-[10px] uppercase border-b border-gray-800">
               <tr>
-                <th className="py-3 px-4 whitespace-nowrap min-w-[150px]">User</th>
-                <th className="py-3 px-4 whitespace-nowrap min-w-[110px]">User ID</th>
-                <th className="py-3 px-4 whitespace-nowrap min-w-[130px]">Latest Message</th>
-                <th className="py-3 px-4 whitespace-nowrap min-w-[150px]">Access Status</th>
-                <th className="py-3 px-4 whitespace-nowrap min-w-[130px]">Auto-Ping Alerts</th>
-                <th className="py-3 px-4 whitespace-nowrap min-w-[210px] text-right">Approval Actions</th>
+                <th className="py-2.5 px-3">Telegram User</th>
+                <th className="py-2.5 px-3">Recent Activity</th>
+                <th className="py-2.5 px-3">Access &amp; Alerts</th>
+                <th className="py-2.5 px-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800/60 font-mono text-[11px]">
               {detectedUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-8 text-center text-gray-500 font-sans text-xs">
+                  <td colSpan="4" className="py-8 text-center text-gray-500 font-sans text-xs">
                     <div className="max-w-md mx-auto space-y-2">
                       <p className="text-gray-400 font-medium">No Telegram users detected yet.</p>
                       <p className="text-[11px] text-gray-500">
@@ -398,156 +396,137 @@ export default function TelegramBot() {
 
                   return (
                     <tr key={user.id} className="hover:bg-gray-800/30 transition">
-                      {/* User display name + username */}
-                      <td className="py-3.5 px-4 font-sans whitespace-nowrap">
+                      {/* 1. User & Identity */}
+                      <td className="py-3 px-3 font-sans">
                         <div className="flex items-center space-x-2.5">
-                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-mongo/20 to-blue-500/20 border border-mongo/30 flex items-center justify-center text-mongo font-bold text-xs shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-mongo/20 to-blue-500/20 border border-mongo/30 flex items-center justify-center text-mongo font-bold text-xs shrink-0">
                             {(user.displayName || user.username || 'U')[0].toUpperCase()}
                           </div>
-                          <div>
-                            <div className="font-semibold text-white flex items-center space-x-1.5">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-white truncate max-w-[140px] flex items-center space-x-1">
                               <span>{user.displayName}</span>
                               {user.isAllowed && (
                                 <span title="Authorized user" className="text-mongo text-xs">✓</span>
                               )}
                             </div>
-                            {user.username && (
-                              <div className="text-[10px] text-blue-400 font-mono">@{user.username}</div>
-                            )}
+                            <div className="flex items-center space-x-1 text-[10px] text-gray-400 font-mono">
+                              {user.username && <span className="text-blue-400 truncate max-w-[90px]">@{user.username}</span>}
+                              <span>•</span>
+                              <span className="text-gray-300">ID: {user.userId}</span>
+                              <button
+                                onClick={() => handleCopy(user.userId)}
+                                title="Copy User ID"
+                                className="text-gray-500 hover:text-mongo transition p-0.5"
+                              >
+                                {copiedId === user.userId ? (
+                                  <Check className="w-2.5 h-2.5 text-mongo" />
+                                ) : (
+                                  <Copy className="w-2.5 h-2.5" />
+                                )}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </td>
 
-                      {/* User ID */}
-                      <td className="py-3.5 px-4 text-gray-300 whitespace-nowrap">
-                        <div className="flex items-center space-x-1.5">
-                          <span className="font-mono text-white font-semibold">{user.userId}</span>
-                          <button
-                            onClick={() => handleCopy(user.userId)}
-                            title="Copy User ID"
-                            className="p-1 text-gray-500 hover:text-mongo transition"
-                          >
-                            {copiedId === user.userId ? (
-                              <Check className="w-3 h-3 text-mongo" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-
-                      {/* Latest Message & Time */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      {/* 2. Recent Message & Time */}
+                      <td className="py-3 px-3">
                         <div className="space-y-0.5">
-                          <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 text-gray-300 text-[10px] font-mono inline-block max-w-[150px] truncate" title={user.lastMessage}>
+                          <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 text-gray-300 text-[10px] font-mono inline-block max-w-[140px] truncate" title={user.lastMessage}>
                             {user.lastMessage || 'None'}
                           </span>
                           <div className="text-[10px] text-gray-500 font-sans">{user.lastActive}</div>
                         </div>
                       </td>
 
-                      {/* Access Status Badge (whitespace-nowrap prevents line breaks) */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {user.isBanned ? (
-                          <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-400 border border-red-500/30 whitespace-nowrap">
-                            <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
-                            <span>Banned</span>
-                          </span>
-                        ) : user.isAllowed ? (
-                          <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-mongo/10 text-mongo border border-mongo/30 whitespace-nowrap shadow-[0_0_10px_rgba(0,237,100,0.15)]">
-                            <span className="w-2 h-2 rounded-full bg-mongo shrink-0" />
-                            <span>Authorized 🟢</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 whitespace-nowrap animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.15)]">
-                            <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                            <span>Pending Approval ⏳</span>
-                          </span>
-                        )}
+                      {/* 3. Access Status & Alerts Toggle */}
+                      <td className="py-3 px-3">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {user.isBanned ? (
+                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/30 whitespace-nowrap">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                              <span>Banned</span>
+                            </span>
+                          ) : user.isAllowed ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-mongo/10 text-mongo border border-mongo/30 whitespace-nowrap">
+                              <span className="w-1.5 h-1.5 rounded-full bg-mongo shrink-0" />
+                              <span>Authorized 🟢</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 whitespace-nowrap animate-pulse">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                              <span>Pending ⏳</span>
+                            </span>
+                          )}
+
+                          {user.isAllowed && (
+                            <button
+                              onClick={() => handleToggleNotifications(user)}
+                              disabled={isProcessing}
+                              title="Toggle keep-alive notifications"
+                              className={`px-2 py-0.5 rounded text-[10px] font-semibold flex items-center space-x-1 transition whitespace-nowrap ${
+                                user.receiveNotifications
+                                  ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                  : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border border-gray-700'
+                              }`}
+                            >
+                              {user.receiveNotifications ? (
+                                <Bell className="w-2.5 h-2.5 text-blue-400 shrink-0" />
+                              ) : (
+                                <BellOff className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                              )}
+                              <span>{user.receiveNotifications ? 'Alerts ON' : 'Muted'}</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
 
-                      {/* Auto-Ping Alerts Toggle */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {!user.isAllowed ? (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[10px] font-mono text-gray-500 bg-gray-900 border border-gray-800 whitespace-nowrap">
-                            <Lock className="w-3 h-3 text-gray-500 shrink-0" />
-                            <span>Requires Approval</span>
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => handleToggleNotifications(user)}
-                            disabled={isProcessing}
-                            title="Toggle Keep-Alive Ping notifications for this user"
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold flex items-center space-x-1.5 whitespace-nowrap transition ${
-                              user.receiveNotifications
-                                ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                                : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border border-gray-700'
-                            }`}
-                          >
-                            {user.receiveNotifications ? (
-                              <>
-                                <Bell className="w-3 h-3 text-blue-400 shrink-0" />
-                                <span>Subscribed</span>
-                              </>
-                            ) : (
-                              <>
-                                <BellOff className="w-3 h-3 text-gray-400 shrink-0" />
-                                <span>Muted</span>
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </td>
-
-                      {/* Action buttons (Allow / Revoke / Set Target / Ban) */}
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end space-x-1.5 whitespace-nowrap">
-                          {/* ALLOW / REVOKE BUTTON */}
+                      {/* 4. Actions (Allow/Revoke, Target, Ban) */}
+                      <td className="py-3 px-3 text-right">
+                        <div className="flex items-center justify-end space-x-1.5">
                           {!user.isAllowed ? (
                             <button
                               onClick={() => handleToggleAllowUser(user, true)}
                               disabled={isProcessing}
-                              className="px-3 py-1.5 bg-mongo hover:bg-mongo-400 text-black font-bold rounded-lg text-xs transition shadow-[0_0_12px_rgba(0,237,100,0.3)] flex items-center space-x-1 whitespace-nowrap disabled:opacity-50"
+                              className="px-2.5 py-1 bg-mongo hover:bg-mongo-400 text-black font-bold rounded-lg text-xs transition shadow-[0_0_10px_rgba(0,237,100,0.3)] flex items-center space-x-1 disabled:opacity-50"
                             >
-                              <Unlock className="w-3.5 h-3.5 shrink-0" />
-                              <span>{isProcessing ? 'Allowing...' : 'Allow Access'}</span>
+                              <Unlock className="w-3 h-3 shrink-0" />
+                              <span>{isProcessing ? 'Allowing...' : 'Allow'}</span>
                             </button>
                           ) : (
                             <button
                               onClick={() => handleToggleAllowUser(user, false)}
                               disabled={isProcessing}
-                              className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-semibold transition flex items-center space-x-1 whitespace-nowrap disabled:opacity-50"
+                              className="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[11px] font-semibold transition flex items-center space-x-1 disabled:opacity-50"
                             >
-                              <Lock className="w-3.5 h-3.5 shrink-0" />
+                              <Lock className="w-3 h-3 shrink-0" />
                               <span>Revoke</span>
                             </button>
                           )}
 
-                          {/* Set Target Recipient */}
                           <button
                             onClick={() => {
                               setChatId(user.chatId || user.userId);
                               showFeedback(`Target Chat ID set to ${user.displayName} (${user.userId})`);
                             }}
                             title="Set as notification target recipient"
-                            className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-xs transition flex items-center space-x-1 whitespace-nowrap"
+                            className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-[11px] transition flex items-center space-x-1"
                           >
                             <Zap className="w-3 h-3 text-mongo shrink-0" />
                             <span>Target</span>
                           </button>
 
-                          {/* Ban Toggle */}
                           {user.isBanned ? (
                             <button
                               onClick={() => handleUnbanUser(user.userId)}
-                              className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-lg text-xs transition whitespace-nowrap"
+                              className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-lg text-[11px] transition"
                             >
                               Unban
                             </button>
                           ) : (
                             <button
                               onClick={() => handlePreFillBan(user)}
-                              className="px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs transition whitespace-nowrap"
+                              className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-[11px] transition"
                             >
                               Ban
                             </button>

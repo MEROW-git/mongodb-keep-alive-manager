@@ -1,5 +1,6 @@
 const { connectToDatabase } = require('./lib/mongodb');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
+const { notifyPingSuccess } = require('./lib/telegramNotifier');
 
 exports.handler = async (event, context) => {
   // Handle CORS preflight
@@ -56,6 +57,13 @@ exports.handler = async (event, context) => {
     // Save log entry to MongoDB logs collection
     const logsCol = db.collection('logs');
     await logsCol.insertOne(logEntry);
+
+    // Broadcast keep-alive success notification to approved Telegram subscribers
+    notifyPingSuccess({
+      latencyMs: responseTimeMs,
+      dbName,
+      source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
+    }).catch((e) => console.error('Auto notification error:', e.message));
 
     const nowIso = new Date().toISOString();
 

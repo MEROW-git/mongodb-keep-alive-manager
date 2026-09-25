@@ -10,6 +10,7 @@ import {
   ExternalLink,
   MessageSquare,
   Bell,
+  BellOff,
   RefreshCw,
   Trash2,
   Save,
@@ -19,6 +20,8 @@ import {
   Check,
   Clock,
   Zap,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -30,7 +33,7 @@ export default function TelegramBot() {
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [notifyOnFailure, setNotifyOnFailure] = useState(true);
-  const [notifyOnPing, setNotifyOnPing] = useState(false);
+  const [notifyOnPing, setNotifyOnPing] = useState(true);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // Ban User form state
@@ -38,6 +41,9 @@ export default function TelegramBot() {
   const [banUsername, setBanUsername] = useState('');
   const [banReason, setBanReason] = useState('');
   const [isBanning, setIsBanning] = useState(false);
+
+  // Action loading state for user approvals
+  const [processingUserId, setProcessingUserId] = useState(null);
 
   const [copiedId, setCopiedId] = useState(null);
   const [feedback, setFeedback] = useState({ text: '', type: '' });
@@ -56,7 +62,7 @@ export default function TelegramBot() {
         setChatId(data.settings.defaultChatId);
       }
       setNotifyOnFailure(data.settings?.notifyOnFailure !== false);
-      setNotifyOnPing(!!data.settings?.notifyOnPing);
+      setNotifyOnPing(data.settings?.notifyOnPing !== false); // Default to true so auto-ping alerts are received
     } catch (err) {
       showFeedback('Failed to load Telegram bot data: ' + err.message, 'error');
     } finally {
@@ -81,13 +87,59 @@ export default function TelegramBot() {
   useEffect(() => {
     loadData();
 
-    // Auto-refresh updates every 5 seconds so new messages show automatically
+    // Auto-refresh updates every 3 seconds so incoming chat messages stream in live
     const interval = setInterval(() => {
       loadData(true);
-    }, 5000);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, []);
+
+  // Allow or Revoke User Access
+  const handleToggleAllowUser = async (user, allow) => {
+    setProcessingUserId(user.userId);
+    try {
+      const res = await api.allowTelegramUser({
+        userId: user.userId,
+        allow,
+        receiveNotifications: true,
+      });
+      showFeedback(
+        allow
+          ? `🎉 Authorized user ${user.displayName || user.userId}! Control buttons & welcome sent to Telegram.`
+          : `Access revoked for user ${user.displayName || user.userId}.`,
+        'success'
+      );
+      await loadData(true);
+    } catch (err) {
+      showFeedback(err.message || 'Failed to update user authorization', 'error');
+    } finally {
+      setProcessingUserId(null);
+    }
+  };
+
+  // Toggle Auto-Ping Notifications for a user
+  const handleToggleNotifications = async (user) => {
+    setProcessingUserId(user.userId);
+    const nextState = !user.receiveNotifications;
+    try {
+      await api.toggleTelegramNotifications({
+        userId: user.userId,
+        receiveNotifications: nextState,
+      });
+      showFeedback(
+        nextState
+          ? `Auto-ping alerts enabled for ${user.displayName || user.userId} 🔔`
+          : `Auto-ping alerts muted for ${user.displayName || user.userId} 🔕`,
+        'success'
+      );
+      await loadData(true);
+    } catch (err) {
+      showFeedback(err.message || 'Failed to toggle notifications', 'error');
+    } finally {
+      setProcessingUserId(null);
+    }
+  };
 
   // Send Notification
   const handleSendMessage = async (e) => {
@@ -102,7 +154,7 @@ export default function TelegramBot() {
       await api.sendTelegramNotification({
         chatId: chatId.trim(),
         message: message.trim(),
-        parseMode: 'Markdown',
+        parseMode: 'HTML',
       });
       showFeedback('Telegram notification sent successfully!', 'success');
       setMessage('');
@@ -194,6 +246,7 @@ export default function TelegramBot() {
   const botInfo = botData?.bot?.info;
   const isConnected = botData?.bot?.connected;
   const detectedUsers = botData?.detectedUsers || [];
+  const recentMessages = botData?.recentMessages || [];
   const bannedUsers = botData?.bannedUsers || [];
 
   return (
@@ -220,7 +273,7 @@ export default function TelegramBot() {
               </span>
             </div>
             <p className="text-xs text-gray-400 mt-1">
-              Live notifications, subscriber discovery, automatic command replies, and user access restrictions.
+              User authorization gate, live incoming chat detection, interactive buttons, and automated ping notifications.
             </p>
           </div>
         </div>
@@ -274,7 +327,7 @@ export default function TelegramBot() {
         </div>
       )}
 
-      {/* DETECTED TELEGRAM USERS / SUBSCRIBERS TABLE */}
+      {/* DETECTED TELEGRAM USERS / SUBSCRIBERS TABLE WITH ACCESS APPROVAL */}
       <div className="glass-panel rounded-2xl p-6 bg-cardBg/90 border border-gray-800/80 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center space-x-2.5">
@@ -284,14 +337,14 @@ export default function TelegramBot() {
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
-                  Detected Telegram Users & Subscribers
+                  Detected Telegram Users & Access Approvals
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-mongo/20 text-mongo border border-mongo/30">
                   {detectedUsers.length} detected
                 </span>
               </div>
               <p className="text-xs text-gray-400">
-                Telegram users who have interacted with <code>@{botInfo?.username || 'bot'}</code> (sent <code>/start</code>, <code>/ping</code>, or <code>/id</code>).
+                Authorize users to unlock bot commands (<code>/ping</code>, <code>/status</code>, interactive buttons) and dispatch auto-ping notifications.
               </p>
             </div>
           </div>
@@ -302,7 +355,7 @@ export default function TelegramBot() {
             className="self-start sm:self-auto px-3 py-1.5 rounded-lg bg-gray-900 hover:bg-gray-800 border border-gray-800 text-xs font-medium text-gray-300 hover:text-white transition flex items-center space-x-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-mongo' : ''}`} />
-            <span>Check for New Users</span>
+            <span>Refresh Users</span>
           </button>
         </div>
 
@@ -311,11 +364,11 @@ export default function TelegramBot() {
             <thead className="bg-[#0B1120] text-gray-400 font-mono text-[10px] uppercase border-b border-gray-800">
               <tr>
                 <th className="py-3 px-4">User</th>
-                <th className="py-3 px-4">Chat / User ID</th>
-                <th className="py-3 px-4">Last Message</th>
-                <th className="py-3 px-4">Last Active</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Quick Actions</th>
+                <th className="py-3 px-4">User ID</th>
+                <th className="py-3 px-4">Latest Message</th>
+                <th className="py-3 px-4">Access Status</th>
+                <th className="py-3 px-4">Auto-Ping Alerts</th>
+                <th className="py-3 px-4 text-right">Approval Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800/60 font-mono text-[11px]">
@@ -340,105 +393,245 @@ export default function TelegramBot() {
                   </td>
                 </tr>
               ) : (
-                detectedUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-800/30 transition">
-                    {/* User display name + username */}
-                    <td className="py-3 px-4 font-sans">
-                      <div className="flex items-center space-x-2.5">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-mongo/20 to-blue-500/20 border border-mongo/30 flex items-center justify-center text-mongo font-bold text-xs">
-                          {(user.displayName || user.username || 'U')[0].toUpperCase()}
+                detectedUsers.map((user) => {
+                  const isProcessing = processingUserId === user.userId;
+
+                  return (
+                    <tr key={user.id} className="hover:bg-gray-800/30 transition">
+                      {/* User display name + username */}
+                      <td className="py-3 px-4 font-sans">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-mongo/20 to-blue-500/20 border border-mongo/30 flex items-center justify-center text-mongo font-bold text-xs">
+                            {(user.displayName || user.username || 'U')[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-white flex items-center space-x-1.5">
+                              <span>{user.displayName}</span>
+                              {user.isAllowed && (
+                                <span title="Authorized user" className="text-mongo text-xs">✓</span>
+                              )}
+                            </div>
+                            {user.username && (
+                              <div className="text-[10px] text-blue-400 font-mono">@{user.username}</div>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-semibold text-white">{user.displayName}</div>
-                          {user.username && (
-                            <div className="text-[10px] text-blue-400 font-mono">@{user.username}</div>
-                          )}
+                      </td>
+
+                      {/* User ID */}
+                      <td className="py-3 px-4 text-gray-300">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-mono text-white font-semibold">{user.userId}</span>
+                          <button
+                            onClick={() => handleCopy(user.userId)}
+                            title="Copy User ID"
+                            className="p-1 text-gray-500 hover:text-mongo transition"
+                          >
+                            {copiedId === user.userId ? (
+                              <Check className="w-3 h-3 text-mongo" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* User ID & Chat ID */}
-                    <td className="py-3 px-4 text-gray-300">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="font-mono text-white font-semibold">{user.userId}</span>
-                        <button
-                          onClick={() => handleCopy(user.userId)}
-                          title="Copy User ID"
-                          className="p-1 text-gray-500 hover:text-mongo transition"
-                        >
-                          {copiedId === user.userId ? (
-                            <Check className="w-3 h-3 text-mongo" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                        </button>
-                      </div>
-                    </td>
+                      {/* Latest Message & Time */}
+                      <td className="py-3 px-4">
+                        <div className="space-y-0.5">
+                          <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 text-gray-300 text-[10px] font-mono inline-block max-w-[150px] truncate" title={user.lastMessage}>
+                            {user.lastMessage || 'None'}
+                          </span>
+                          <div className="text-[10px] text-gray-500 font-sans">{user.lastActive}</div>
+                        </div>
+                      </td>
 
-                    {/* Last Message */}
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 text-gray-300 text-[10px] font-mono">
-                        {user.lastMessage || 'None'}
-                      </span>
-                    </td>
-
-                    {/* Last Active */}
-                    <td className="py-3 px-4 text-gray-400 font-sans text-[11px]">
-                      {user.lastActive}
-                    </td>
-
-                    {/* Status */}
-                    <td className="py-3 px-4">
-                      {user.isBanned ? (
-                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                          <span>Banned</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-mongo/10 text-mongo border border-mongo/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-mongo" />
-                          <span>Active</span>
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Action buttons */}
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end space-x-1.5">
-                        <button
-                          onClick={() => {
-                            setChatId(user.chatId || user.userId);
-                            showFeedback(`Target Chat ID set to ${user.displayName} (${user.userId})`);
-                          }}
-                          title="Set as notification target recipient"
-                          className="px-2.5 py-1 bg-mongo/10 hover:bg-mongo/20 text-mongo border border-mongo/30 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1"
-                        >
-                          <Zap className="w-3 h-3" />
-                          <span>Select Target</span>
-                        </button>
-
+                      {/* Access Status Badge */}
+                      <td className="py-3 px-4">
                         {user.isBanned ? (
-                          <button
-                            onClick={() => handleUnbanUser(user.userId)}
-                            className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-lg text-[10px] transition"
-                          >
-                            Unban
-                          </button>
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                            <span>Banned</span>
+                          </span>
+                        ) : user.isAllowed ? (
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-mongo/10 text-mongo border border-mongo/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-mongo" />
+                            <span>Authorized 🟢</span>
+                          </span>
                         ) : (
-                          <button
-                            onClick={() => handlePreFillBan(user)}
-                            className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-[10px] transition"
-                          >
-                            Ban User
-                          </button>
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            <span>Pending Approval ⏳</span>
+                          </span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+
+                      {/* Auto-Ping Alerts Toggle */}
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => handleToggleNotifications(user)}
+                          disabled={isProcessing || !user.isAllowed}
+                          title={user.isAllowed ? 'Toggle Keep-Alive Ping notifications for this user' : 'Must authorize user first'}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold flex items-center space-x-1.5 transition ${
+                            !user.isAllowed
+                              ? 'opacity-40 cursor-not-allowed bg-gray-900 border border-gray-800 text-gray-500'
+                              : user.receiveNotifications
+                              ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                              : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border border-gray-700'
+                          }`}
+                        >
+                          {user.receiveNotifications ? (
+                            <>
+                              <Bell className="w-3 h-3 text-blue-400" />
+                              <span>Subscribed</span>
+                            </>
+                          ) : (
+                            <>
+                              <BellOff className="w-3 h-3 text-gray-400" />
+                              <span>Muted</span>
+                            </>
+                          )}
+                        </button>
+                      </td>
+
+                      {/* Action buttons (Allow / Revoke / Set Target / Ban) */}
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end space-x-1.5">
+                          {/* ALLOW / REVOKE BUTTON */}
+                          {!user.isAllowed ? (
+                            <button
+                              onClick={() => handleToggleAllowUser(user, true)}
+                              disabled={isProcessing}
+                              className="px-3 py-1 bg-mongo hover:bg-mongo-400 text-black font-bold rounded-lg text-[11px] transition shadow-[0_0_12px_rgba(0,237,100,0.3)] flex items-center space-x-1 disabled:opacity-50"
+                            >
+                              <Unlock className="w-3 h-3" />
+                              <span>{isProcessing ? 'Allowing...' : 'Allow Access'}</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleToggleAllowUser(user, false)}
+                              disabled={isProcessing}
+                              className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[10px] font-semibold transition flex items-center space-x-1 disabled:opacity-50"
+                            >
+                              <Lock className="w-3 h-3" />
+                              <span>Revoke</span>
+                            </button>
+                          )}
+
+                          {/* Set Target Recipient */}
+                          <button
+                            onClick={() => {
+                              setChatId(user.chatId || user.userId);
+                              showFeedback(`Target Chat ID set to ${user.displayName} (${user.userId})`);
+                            }}
+                            title="Set as notification target recipient"
+                            className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-[10px] transition flex items-center space-x-1"
+                          >
+                            <Zap className="w-3 h-3 text-mongo" />
+                            <span>Target</span>
+                          </button>
+
+                          {/* Ban Toggle */}
+                          {user.isBanned ? (
+                            <button
+                              onClick={() => handleUnbanUser(user.userId)}
+                              className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-lg text-[10px] transition"
+                            >
+                              Unban
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handlePreFillBan(user)}
+                              className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-[10px] transition"
+                            >
+                              Ban
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* LIVE INCOMING TELEGRAM CHAT MESSAGES DETECTED FEED */}
+      <div className="glass-panel rounded-2xl p-6 bg-cardBg/90 border border-gray-800/80 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400">
+              <MessageSquare className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
+                  Live Detected Chat Messages
+                </h3>
+                <span className="w-2 h-2 rounded-full bg-mongo animate-ping" />
+              </div>
+              <p className="text-xs text-gray-400">
+                Incoming commands, greetings, and queries received from Telegram in real time.
+              </p>
+            </div>
+          </div>
+
+          <div className="text-[11px] font-mono text-gray-500 flex items-center space-x-1">
+            <Clock className="w-3 h-3" />
+            <span>Auto-refreshing (3s)</span>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-800 overflow-hidden max-h-60 overflow-y-auto divide-y divide-gray-800/50">
+          {recentMessages.length === 0 ? (
+            <div className="p-6 text-center text-gray-500 text-xs">
+              No chat messages received yet. Send a message to <code>@{botInfo?.username || 'bot'}</code> on Telegram.
+            </div>
+          ) : (
+            recentMessages.map((msg) => (
+              <div key={msg.id} className="p-3 bg-[#0B1120]/60 hover:bg-gray-800/30 transition flex items-start justify-between gap-4">
+                <div className="flex items-start space-x-3">
+                  <div className="w-7 h-7 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs shrink-0 mt-0.5">
+                    {(msg.displayName || msg.username || 'U')[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-semibold text-white text-xs">{msg.displayName}</span>
+                      {msg.username && (
+                        <span className="text-[10px] text-blue-400 font-mono">@{msg.username}</span>
+                      )}
+                      {msg.isCommand && (
+                        <span className="px-1.5 py-0.2 rounded bg-mongo/20 text-mongo text-[9px] font-mono uppercase font-bold border border-mongo/30">
+                          CMD
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-200 mt-1 font-mono bg-gray-900/80 px-2.5 py-1 rounded-lg border border-gray-800 inline-block">
+                      {msg.text}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2 shrink-0">
+                  <span className="text-[10px] text-gray-500 font-mono">{msg.time}</span>
+                  <button
+                    onClick={() => {
+                      setChatId(msg.chatId || msg.userId);
+                      setMessage(`Hello @${msg.username || msg.displayName}, `);
+                      showFeedback(`Reply target set to ${msg.displayName}`);
+                    }}
+                    title="Reply to this message"
+                    className="p-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition text-[10px] flex items-center space-x-1"
+                  >
+                    <Send className="w-3 h-3 text-mongo" />
+                    <span>Reply</span>
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -456,7 +649,7 @@ export default function TelegramBot() {
                 </h3>
               </div>
               <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
-                Markdown
+                HTML
               </span>
             </div>
 
@@ -511,21 +704,21 @@ export default function TelegramBot() {
               <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
-                  onClick={() => applyPreset('🟢 *MongoDB Atlas Keep-Alive*\n\nDatabase: `system_reset`\nStatus: ONLINE\nLatency: 42 ms\nCluster is active and healthy.')}
+                  onClick={() => applyPreset('🟢 <b>MongoDB Atlas Keep-Alive</b>\n\nDatabase: <code>system_reset</code>\nStatus: ONLINE\nLatency: 38 ms\nCluster is active and healthy.')}
                   className="px-2.5 py-1 rounded-lg bg-gray-800/90 hover:bg-gray-700 text-gray-300 text-[11px] transition"
                 >
                   🟢 Status Ping
                 </button>
                 <button
                   type="button"
-                  onClick={() => applyPreset('🚨 *MongoDB Atlas Alert*\n\nDatabase ping reported higher latency or connection drop.\nPlease inspect dashboard immediately.')}
+                  onClick={() => applyPreset('🚨 <b>MongoDB Atlas Alert</b>\n\nDatabase ping reported higher latency or connection drop.\nPlease inspect dashboard immediately.')}
                   className="px-2.5 py-1 rounded-lg bg-gray-800/90 hover:bg-gray-700 text-red-300 text-[11px] transition"
                 >
                   🚨 High Alert
                 </button>
                 <button
                   type="button"
-                  onClick={() => applyPreset('📢 *Keep-Alive Maintenance Announcement*\n\nScheduled bot health verification in progress.')}
+                  onClick={() => applyPreset('📢 <b>Keep-Alive Maintenance Announcement</b>\n\nScheduled bot health verification in progress.')}
                   className="px-2.5 py-1 rounded-lg bg-gray-800/90 hover:bg-gray-700 text-blue-300 text-[11px] transition"
                 >
                   📢 Announcement
@@ -536,14 +729,14 @@ export default function TelegramBot() {
             {/* Message Body */}
             <div>
               <label className="block text-xs font-medium text-gray-300 uppercase tracking-wider mb-1.5">
-                Notification Message
+                Notification Message (HTML Support)
               </label>
               <textarea
                 rows={5}
                 required
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type notification message here (supports *bold*, _italic_, `code`)..."
+                placeholder="Type notification message here (supports <b>bold</b>, <i>italic</i>, <code>code</code>)..."
                 className="w-full p-3 bg-gray-900/90 border border-gray-800 rounded-xl text-white placeholder-gray-500 text-xs font-mono focus:outline-none focus:border-mongo focus:ring-1 focus:ring-mongo resize-none"
               />
             </div>
@@ -569,7 +762,7 @@ export default function TelegramBot() {
               <label className="flex items-center justify-between p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 text-xs cursor-pointer">
                 <div>
                   <div className="text-gray-200 font-medium">Alert on Ping Failures</div>
-                  <div className="text-[11px] text-gray-500">Sends emergency alert to default Chat ID if MongoDB ping fails.</div>
+                  <div className="text-[11px] text-gray-500">Sends emergency alert to authorized subscribers if MongoDB ping fails.</div>
                 </div>
                 <input
                   type="checkbox"
@@ -581,8 +774,8 @@ export default function TelegramBot() {
 
               <label className="flex items-center justify-between p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 text-xs cursor-pointer">
                 <div>
-                  <div className="text-gray-200 font-medium">Alert on Every Ping Cycle</div>
-                  <div className="text-[11px] text-gray-500">Sends status report every time keep-alive executes (high frequency).</div>
+                  <div className="text-gray-200 font-medium">Alert on Every Ping Cycle (Auto-Ping)</div>
+                  <div className="text-[11px] text-gray-500">Sends success report to all authorized subscribers when database ping succeeds.</div>
                 </div>
                 <input
                   type="checkbox"

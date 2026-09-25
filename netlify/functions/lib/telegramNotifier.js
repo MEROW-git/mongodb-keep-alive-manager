@@ -1,0 +1,122 @@
+const { connectToDatabase } = require('./mongodb');
+require('dotenv').config();
+
+const BOT_TOKEN = process.env.telegram_bot || process.env.TELEGRAM_BOT_TOKEN;
+
+/**
+ * Send a Telegram message safely with HTML formatting and plain text fallback
+ */
+async function sendTelegramMessage(chatId, text, options = {}) {
+  if (!BOT_TOKEN || !chatId) return null;
+
+  const payload = {
+    chat_id: String(chatId),
+    text,
+    parse_mode: options.parseMode || 'HTML',
+    ...(options.reply_markup ? { reply_markup: options.reply_markup } : {}),
+  };
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      // Fallback without parse_mode if formatting has issues
+      const plainText = text.replace(/<[^>]*>/g, '').replace(/[*_`]/g, '');
+      const retryRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: String(chatId),
+          text: plainText,
+          ...(options.reply_markup ? { reply_markup: options.reply_markup } : {}),
+        }),
+      });
+      return await retryRes.json();
+    }
+    return data;
+  } catch (err) {
+    console.error('sendTelegramMessage error:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Dispatch automatic notification when keep-alive ping succeeds
+ */
+async function notifyPingSuccess({ latencyMs, dbName = 'system_reset', source = 'KEEP_ALIVE_PULSE' }) {
+  if (!BOT_TOKEN) return;
+
+  try {
+    const { db } = await connectToDatabase();
+    const settings = await db.collection('settings').findOne({});
+
+    // If auto ping notifications are globally disabled in settings, skip
+    // By default, if notifyOnPing is true or unset, we allow it if user requested
+    if (settings && settings.telegramNotifyOnPing === false) {
+      return;
+    }
+
+    const usersCol = db.collection('telegram_users');
+    const bansCol = db.collection('telegram_bans');
+
+    const [allowedUsers, bannedUsers] = await Promise.all([
+      usersCol.find({ isAllowed: true, receiveNotifications: { $ne: false } }).toArray(),
+      bansCol.find({}).toArray(),
+    ]);
+
+    const bannedSet = new Set(bannedUsers.map((b) => b.userId));
+
+    // Compile unique recipients
+    const recipientChatIds = new Set();
+
+    for (const u of allowedUsers) {
+      if (!bannedSet.has(u.userId)) {
+        recipientChatIds.add(String(u.chatId || u.userId));
+      }
+    }
+
+    // Include default chat ID from settings if configured and not banned
+    if (settings?.telegramDefaultChatId && !bannedSet.has(settings.telegramDefaultChatId)) {
+      recipientChatIds.add(String(settings.telegramDefaultChatId));
+    }
+
+    if (recipientChatIds.size === 0) {
+      return;
+    }
+
+    const timeStr = new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+
+    const notificationMessage =
+      `🟢 <b>MongoDB Keep-Alive Successful!</b>\n\n` +
+      `• <b>Database:</b> <code>${dbName}</code>\n` +
+      `• <b>Cluster Status:</b> <b>ONLINE &amp; HEALTHY</b>\n` +
+      `• <b>Latency:</b> <code>${latencyMs} ms</code>\n` +
+      `• <b>Source:</b> <code>${source}</code>\n` +
+      `• <b>Timestamp:</b> <code>${timeStr}</code>\n\n` +
+      `✨ <i>Keep-alive pulse confirmed. Database active.</i>`;
+
+    for (const chatId of recipientChatIds) {
+      try {
+        await sendTelegramMessage(chatId, notificationMessage);
+      } catch (err) {
+        console.error(`Failed to send ping notification to ${chatId}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('notifyPingSuccess error:', err.message);
+  }
+}
+
+module.exports = {
+  sendTelegramMessage,
+  notifyPingSuccess,
+};

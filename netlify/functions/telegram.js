@@ -24,27 +24,57 @@ async function callTelegramApi(method, payload = {}) {
 /**
  * Send Telegram message with safe HTML fallback
  */
-async function sendSafeTelegramMessage(chatId, text, parseMode = 'HTML') {
+async function sendSafeTelegramMessage(chatId, text, options = {}) {
+  const parseMode = options.parseMode || 'HTML';
+  const payload = {
+    chat_id: String(chatId),
+    text,
+    parse_mode: parseMode,
+    ...(options.reply_markup ? { reply_markup: options.reply_markup } : {}),
+  };
+
   try {
-    const res = await callTelegramApi('sendMessage', {
-      chat_id: chatId,
-      text,
-      parse_mode: parseMode,
-    });
+    const res = await callTelegramApi('sendMessage', payload);
     if (res.ok) return res;
+
     // If markdown/html parsing fails, strip tags and send as plain text
     const plainText = text.replace(/<[^>]*>/g, '').replace(/[*_`]/g, '');
     return await callTelegramApi('sendMessage', {
-      chat_id: chatId,
+      chat_id: String(chatId),
       text: plainText,
+      ...(options.reply_markup ? { reply_markup: options.reply_markup } : {}),
     });
   } catch (err) {
     const plainText = text.replace(/<[^>]*>/g, '').replace(/[*_`]/g, '');
     return await callTelegramApi('sendMessage', {
-      chat_id: chatId,
+      chat_id: String(chatId),
       text: plainText,
+      ...(options.reply_markup ? { reply_markup: options.reply_markup } : {}),
     });
   }
+}
+
+/**
+ * Common Reply Keyboard for authorized users
+ */
+const AUTHORIZED_KEYBOARD = {
+  keyboard: [
+    [{ text: '🟢 Cluster Status' }, { text: '⚡ Instant Ping' }],
+    [{ text: '🆔 My ID' }, { text: '❓ Help' }],
+  ],
+  resize_keyboard: true,
+  is_persistent: true,
+};
+
+/**
+ * Escape special HTML characters
+ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 /**
@@ -59,11 +89,27 @@ async function processTelegramMessage(db, message) {
   const firstName = message.from?.first_name || '';
   const lastName = message.from?.last_name || '';
   const text = (message.text || '').trim();
+  const displayName = [firstName, lastName].filter(Boolean).join(' ') || username || `User ${userId}`;
 
   const bansCol = db.collection('telegram_bans');
   const usersCol = db.collection('telegram_users');
+  const messagesCol = db.collection('telegram_messages');
 
-  // Record or update user in detected list
+  // 1. Log chat message in telegram_messages collection for dashboard live feed
+  await messagesCol.insertOne({
+    userId,
+    chatId: String(chatId),
+    username: username.replace(/^@/, ''),
+    displayName,
+    text,
+    isCommand: text.startsWith('/'),
+    createdAt: new Date(),
+  });
+
+  // 2. Retrieve existing user or create as Pending Approval
+  const existingUser = await usersCol.findOne({ userId });
+  const isAllowed = existingUser ? !!existingUser.isAllowed : false;
+
   await usersCol.updateOne(
     { userId },
     {
@@ -73,18 +119,20 @@ async function processTelegramMessage(db, message) {
         username: username.replace(/^@/, ''),
         firstName,
         lastName,
-        displayName: [firstName, lastName].filter(Boolean).join(' ') || username || `User ${userId}`,
+        displayName,
         lastMessage: text,
         lastActive: new Date(),
       },
       $setOnInsert: {
         firstSeen: new Date(),
+        isAllowed: false, // Default is pending approval!
+        receiveNotifications: true,
       },
     },
     { upsert: true }
   );
 
-  // Check if user is banned
+  // 3. Check if user is banned
   const ban = await bansCol.findOne({ userId });
   if (ban) {
     await sendSafeTelegramMessage(
@@ -94,56 +142,103 @@ async function processTelegramMessage(db, message) {
     return { status: 'banned', userId };
   }
 
-  // Handle Telegram Commands
-  if (text.startsWith('/start') || text.startsWith('/help')) {
-    const dbName = process.env.MONGO_DB_NAME || 'system_reset';
-    const welcomeText =
-      `👋 <b>Welcome to MongoDB Keep Alive Bot!</b>\n\n` +
-      `• <b>Your Chat ID:</b> <code>${chatId}</code>\n` +
-      `• <b>Your User ID:</b> <code>${userId}</code>\n` +
-      `• <b>Database Target:</b> <code>${dbName}</code>\n` +
-      `• <b>Status:</b> 🟢 <b>Connected &amp; Active</b>\n\n` +
-      `<b>Available Commands:</b>\n` +
-      `• <code>/status</code> - View current MongoDB cluster health &amp; latency\n` +
-      `• <code>/ping</code> - Execute instant keep-alive ping\n` +
-      `• <code>/id</code> - Show your Telegram Chat ID\n\n` +
-      `<i>Your user account is now detected in the Keep-Alive Dashboard.</i>`;
+  const dbName = process.env.MONGO_DB_NAME || 'system_reset';
 
-    await sendSafeTelegramMessage(chatId, welcomeText);
-    return { status: 'welcomed', userId };
+  // 4. Access Gate: Check if user is allowed / authorized by Admin
+  if (!isAllowed) {
+    if (text.startsWith('/start') || text.startsWith('/help')) {
+      const warmWelcomeText =
+        `✨ <b>Hello, ${escapeHtml(firstName || displayName)}! Warm welcome!</b> 🐱👋\n\n` +
+        `I am your <b>MongoDB Keep-Alive Assistant</b> for database <code>${dbName}</code>.\n\n` +
+        `⏳ <b>Status: Pending Administrator Approval</b>\n` +
+        `• <b>Your Telegram User ID:</b> <code>${userId}</code>\n` +
+        `• <b>Your Chat ID:</b> <code>${chatId}</code>\n\n` +
+        `🔒 <i>To keep your database secure, new users must be authorized by an administrator in the Keep-Alive Dashboard before commands or interactive buttons are unlocked.</i>\n\n` +
+        `Your message has been detected and is visible in the dashboard. Once the administrator clicks <b>"Allow Access"</b>, you will receive an automatic confirmation with your control buttons!`;
+
+      await sendSafeTelegramMessage(chatId, warmWelcomeText);
+      return { status: 'pending_approval_welcome', userId };
+    }
+
+    // Any other text or command while unauthorized
+    const pendingNotice =
+      `🔒 <b>Authorization Required</b>\n\n` +
+      `Hello ${escapeHtml(firstName || displayName)}! Your account (ID: <code>${userId}</code>) is waiting for administrator approval in the Keep-Alive Dashboard.\n\n` +
+      `Please ask your dashboard administrator to click <b>"Allow Access"</b> for your user.`;
+
+    await sendSafeTelegramMessage(chatId, pendingNotice);
+    return { status: 'unauthorized', userId };
   }
 
-  if (text.startsWith('/id')) {
+  // 5. Authorized User Handlers
+  const isStatus = text.startsWith('/status') || text.includes('Cluster Status');
+  const isPing = text.startsWith('/ping') || text.includes('Instant Ping');
+  const isId = text.startsWith('/id') || text.includes('My ID');
+  const isHelp = text.startsWith('/help') || text.includes('Help');
+
+  if (text.startsWith('/start') || isHelp) {
+    const authorizedWelcome =
+      `✨ <b>Welcome back, ${escapeHtml(firstName || displayName)}!</b> 🐱🟢\n\n` +
+      `Your account is <b>Authorized</b> to interact with MongoDB cluster <code>${dbName}</code>.\n\n` +
+      `⚡ <b>Quick Actions:</b>\n` +
+      `• Tap <b>🟢 Cluster Status</b> to inspect database latency\n` +
+      `• Tap <b>⚡ Instant Ping</b> to verify connection &amp; keep alive\n` +
+      `• Tap <b>🆔 My ID</b> to view your Telegram Chat ID\n\n` +
+      `🔔 <i>You are also subscribed to automated notifications whenever the database is pinged successfully!</i>`;
+
+    await sendSafeTelegramMessage(chatId, authorizedWelcome, {
+      reply_markup: AUTHORIZED_KEYBOARD,
+    });
+    return { status: 'authorized_welcome', userId };
+  }
+
+  if (isId) {
     await sendSafeTelegramMessage(
       chatId,
-      `🆔 <b>Your Telegram Chat ID:</b> <code>${chatId}</code>\n\nUse this Chat ID in the admin dashboard to receive keep-alive alerts.`
+      `🆔 <b>Your Telegram Identity:</b>\n\n` +
+      `• <b>Chat ID:</b> <code>${chatId}</code>\n` +
+      `• <b>User ID:</b> <code>${userId}</code>\n` +
+      `• <b>Authorization:</b> 🟢 <b>Allowed &amp; Active</b>\n` +
+      `• <b>Keep-Alive Alerts:</b> Subscribed`,
+      { reply_markup: AUTHORIZED_KEYBOARD }
     );
     return { status: 'id_sent', userId };
   }
 
-  if (text.startsWith('/ping') || text.startsWith('/status')) {
+  if (isPing || isStatus) {
     const pingStart = Date.now();
     await db.command({ ping: 1 });
     const latency = Date.now() - pingStart;
 
-    const dbName = process.env.MONGO_DB_NAME || 'system_reset';
+    const timeStr = new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+
     const statusText =
       `🟢 <b>MongoDB Atlas Status: ONLINE</b>\n\n` +
       `• <b>Database:</b> <code>${dbName}</code>\n` +
-      `• <b>Cluster:</b> Production Atlas\n` +
-      `• <b>Latency:</b> <code>${latency} ms</code>\n` +
-      `• <b>Timestamp:</b> <code>${new Date().toISOString()}</code>\n\n` +
-      `Keep-Alive bot is actively monitoring your cluster.`;
+      `• <b>Cluster Status:</b> <b>HEALTHY &amp; OPERATIONAL</b>\n` +
+      `• <b>Response Latency:</b> <code>${latency} ms</code>\n` +
+      `• <b>Executed by:</b> ${escapeHtml(displayName)}\n` +
+      `• <b>Timestamp:</b> <code>${timeStr}</code>\n\n` +
+      `✨ <i>Keep-alive connection verified active.</i>`;
 
-    await sendSafeTelegramMessage(chatId, statusText);
+    await sendSafeTelegramMessage(chatId, statusText, {
+      reply_markup: AUTHORIZED_KEYBOARD,
+    });
     return { status: 'status_sent', userId, latency };
   }
 
-  // Generic conversational response
+  // Conversational response with control keyboard
   if (text) {
     await sendSafeTelegramMessage(
       chatId,
-      `🤖 <b>MongoDB Keep Alive Bot</b>\n\nType <code>/status</code> to check cluster health or <code>/id</code> to get your Chat ID.`
+      `🤖 <b>MongoDB Keep-Alive Assistant</b>\n\n` +
+      `Received: <i>"${escapeHtml(text)}"</i>\n\n` +
+      `Tap the buttons below to check cluster latency or run an instant keep-alive ping!`,
+      { reply_markup: AUTHORIZED_KEYBOARD }
     );
   }
 
@@ -191,6 +286,7 @@ async function syncTelegramUpdates(db) {
 }
 
 exports.callTelegramApi = callTelegramApi;
+exports.sendSafeTelegramMessage = sendSafeTelegramMessage;
 exports.processTelegramMessage = processTelegramMessage;
 exports.syncTelegramUpdates = syncTelegramUpdates;
 
@@ -204,7 +300,7 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Handle Telegram Incoming Webhook (called by Telegram server if webhook is registered)
+  // Handle Telegram Incoming Webhook
   const isWebhook = event.queryStringParameters?.action === 'webhook' || event.path?.includes('webhook');
   if (isWebhook && event.httpMethod === 'POST') {
     let update = {};
@@ -243,12 +339,13 @@ exports.handler = async (event, context) => {
     const { db } = await connectToDatabase();
     const bansCol = db.collection('telegram_bans');
     const usersCol = db.collection('telegram_users');
+    const messagesCol = db.collection('telegram_messages');
     const settingsCol = db.collection('settings');
 
     // Automatically drain pending updates on GET or sync request
     await syncTelegramUpdates(db);
 
-    // GET: Retrieve bot status, settings, detected users, and banned users list
+    // GET: Retrieve bot status, settings, detected users, chat messages, and banned users list
     if (event.httpMethod === 'GET') {
       let botInfo = null;
       let botError = null;
@@ -264,9 +361,10 @@ exports.handler = async (event, context) => {
         botError = e.message;
       }
 
-      const [bannedUsers, detectedUsers, appSettings] = await Promise.all([
+      const [bannedUsers, detectedUsers, recentMessages, appSettings] = await Promise.all([
         bansCol.find({}).sort({ bannedAt: -1 }).toArray(),
         usersCol.find({}).sort({ lastActive: -1 }).limit(50).toArray(),
+        messagesCol.find({}).sort({ createdAt: -1 }).limit(30).toArray(),
         settingsCol.findOne({}),
       ]);
 
@@ -290,7 +388,21 @@ exports.handler = async (event, context) => {
         lastMessage: u.lastMessage || '',
         lastActive: u.lastActive ? new Date(u.lastActive).toLocaleString('en-US') : 'N/A',
         firstSeen: u.firstSeen ? new Date(u.firstSeen).toLocaleString('en-US') : 'N/A',
+        isAllowed: !!u.isAllowed,
+        receiveNotifications: u.receiveNotifications !== false,
         isBanned: bannedMap.has(u.userId),
+      }));
+
+      const formattedMessages = recentMessages.map((m) => ({
+        id: m._id.toString(),
+        userId: m.userId,
+        chatId: m.chatId,
+        username: m.username,
+        displayName: m.displayName,
+        text: m.text,
+        isCommand: !!m.isCommand,
+        time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString('en-US') : 'N/A',
+        date: m.createdAt ? new Date(m.createdAt).toLocaleDateString('en-US') : 'N/A',
       }));
 
       return jsonResponse(200, {
@@ -307,11 +419,12 @@ exports.handler = async (event, context) => {
           notifyOnFailure: appSettings?.telegramNotifyOnFailure !== false, // default true
         },
         detectedUsers: formattedDetected,
+        recentMessages: formattedMessages,
         bannedUsers: formattedBans,
       });
     }
 
-    // POST: Manage bot actions (send notification, ban user, unban user, update preferences, sync)
+    // POST: Manage bot actions (allow user, send notification, ban user, unban user, update preferences, sync)
     if (event.httpMethod === 'POST') {
       let body = {};
       try {
@@ -322,7 +435,80 @@ exports.handler = async (event, context) => {
 
       const { action } = body;
 
-      // 1. Manual Sync Updates
+      // 1. Allow / Approve or Revoke User Access
+      if (action === 'allow_user') {
+        const { userId, allow, receiveNotifications } = body;
+        if (!userId) {
+          return jsonResponse(400, { status: 'error', message: 'User ID is required' });
+        }
+
+        const cleanUserId = String(userId).trim();
+        const isAllow = allow !== false;
+
+        await usersCol.updateOne(
+          { userId: cleanUserId },
+          {
+            $set: {
+              isAllowed: isAllow,
+              receiveNotifications: receiveNotifications !== undefined ? !!receiveNotifications : true,
+              approvedAt: isAllow ? new Date() : null,
+              approvedBy: isAllow ? (decoded.username || 'admin') : null,
+              updatedAt: new Date(),
+            },
+          },
+          { upsert: true }
+        );
+
+        const targetUser = await usersCol.findOne({ userId: cleanUserId });
+        const targetChatId = targetUser?.chatId || cleanUserId;
+        const targetName = targetUser?.firstName || targetUser?.displayName || cleanUserId;
+
+        if (isAllow) {
+          const approvalText =
+            `🎉 <b>Authorization Approved!</b> 🐱🚀\n\n` +
+            `Hello <b>${escapeHtml(targetName)}</b>! The administrator has <b>approved your account</b> for the MongoDB Keep-Alive Assistant!\n\n` +
+            `⚡ <b>Commands &amp; Buttons Unlocked:</b>\n` +
+            `• Tap <b>🟢 Cluster Status</b> to inspect database latency\n` +
+            `• Tap <b>⚡ Instant Ping</b> to verify connection &amp; keep alive\n` +
+            `• Tap <b>🆔 My ID</b> to view your Chat ID\n\n` +
+            `🔔 <i>You will now receive automatic notifications whenever the database is pinged successfully!</i>`;
+
+          await sendSafeTelegramMessage(targetChatId, approvalText, {
+            reply_markup: AUTHORIZED_KEYBOARD,
+          });
+        } else {
+          await sendSafeTelegramMessage(
+            targetChatId,
+            `🔒 <b>Access Updated:</b> Your access to commands and keep-alive alerts has been revoked or set to pending by the administrator.`,
+            { reply_markup: { remove_keyboard: true } }
+          );
+        }
+
+        return jsonResponse(200, {
+          status: 'success',
+          message: isAllow ? `User ${cleanUserId} authorized successfully!` : `User ${cleanUserId} access revoked.`,
+          isAllowed: isAllow,
+        });
+      }
+
+      // 2. Toggle Auto-Ping Notifications for a user
+      if (action === 'toggle_notifications') {
+        const { userId, receiveNotifications } = body;
+        const cleanUserId = String(userId).trim();
+
+        await usersCol.updateOne(
+          { userId: cleanUserId },
+          { $set: { receiveNotifications: !!receiveNotifications, updatedAt: new Date() } }
+        );
+
+        return jsonResponse(200, {
+          status: 'success',
+          message: `Notifications for ${cleanUserId} updated`,
+          receiveNotifications: !!receiveNotifications,
+        });
+      }
+
+      // 3. Manual Sync Updates
       if (action === 'sync_updates') {
         const syncResult = await syncTelegramUpdates(db);
         return jsonResponse(200, {
@@ -332,9 +518,9 @@ exports.handler = async (event, context) => {
         });
       }
 
-      // 2. Send Notification
+      // 4. Send Notification
       if (action === 'send_notification') {
-        const { chatId, message, parseMode = 'Markdown' } = body;
+        const { chatId, message, parseMode = 'HTML' } = body;
         if (!chatId || !message) {
           return jsonResponse(400, {
             status: 'error',
@@ -353,18 +539,7 @@ exports.handler = async (event, context) => {
           });
         }
 
-        const telegramRes = await callTelegramApi('sendMessage', {
-          chat_id: cleanChatId,
-          text: message,
-          parse_mode: parseMode,
-        });
-
-        if (!telegramRes.ok) {
-          return jsonResponse(400, {
-            status: 'error',
-            message: telegramRes.description || 'Telegram API failed to dispatch message',
-          });
-        }
+        const telegramRes = await sendSafeTelegramMessage(cleanChatId, message, { parseMode });
 
         // Store default chat ID for convenience
         await settingsCol.updateOne(
@@ -376,11 +551,11 @@ exports.handler = async (event, context) => {
         return jsonResponse(200, {
           status: 'success',
           message: 'Telegram notification delivered successfully!',
-          result: telegramRes.result,
+          result: telegramRes,
         });
       }
 
-      // 3. Ban Telegram User
+      // 5. Ban Telegram User
       if (action === 'ban_user') {
         const { userId, username, reason } = body;
         if (!userId) {
@@ -408,15 +583,21 @@ exports.handler = async (event, context) => {
           bannedBy: decoded.username || 'admin',
         });
 
-        // Optionally send ban alert to that chat if possible
+        // Revoke access as well
+        await usersCol.updateOne(
+          { userId: cleanUserId },
+          { $set: { isAllowed: false } }
+        );
+
+        // Optionally send ban alert to that chat
         try {
-          await callTelegramApi('sendMessage', {
-            chat_id: cleanUserId,
-            text: `🚫 *You have been banned from using this bot.*\n*Reason:* ${reason || 'Administrative restriction.'}`,
-            parse_mode: 'Markdown',
-          });
+          await sendSafeTelegramMessage(
+            cleanUserId,
+            `🚫 <b>You have been banned from using this bot.</b>\n<b>Reason:</b> ${escapeHtml(reason || 'Administrative restriction.')}`,
+            { reply_markup: { remove_keyboard: true } }
+          );
         } catch (e) {
-          // Ignore if user blocked bot or invalid chat
+          // Ignore if user blocked bot
         }
 
         return jsonResponse(200, {
@@ -425,7 +606,7 @@ exports.handler = async (event, context) => {
         });
       }
 
-      // 4. Unban Telegram User
+      // 6. Unban Telegram User
       if (action === 'unban_user') {
         const { userId } = body;
         if (!userId) {
@@ -440,11 +621,10 @@ exports.handler = async (event, context) => {
         }
 
         try {
-          await callTelegramApi('sendMessage', {
-            chat_id: cleanUserId,
-            text: `✅ *Your ban has been lifted.* You can now interact with the MongoDB Keep Alive Bot again.`,
-            parse_mode: 'Markdown',
-          });
+          await sendSafeTelegramMessage(
+            cleanUserId,
+            `✅ <b>Your ban has been lifted.</b> You can now interact with the MongoDB Keep Alive Bot again.`
+          );
         } catch (e) {
           // Ignore if failed
         }
@@ -455,7 +635,7 @@ exports.handler = async (event, context) => {
         });
       }
 
-      // 5. Update Telegram Notification Preferences
+      // 7. Update Telegram Notification Preferences
       if (action === 'update_settings') {
         const { defaultChatId, notifyOnPing, notifyOnFailure } = body;
         const updates = { updatedAt: new Date() };

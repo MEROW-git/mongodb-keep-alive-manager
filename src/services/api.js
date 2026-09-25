@@ -186,6 +186,29 @@ export const api = {
     });
   },
 
+  async allowTelegramUser({ userId, allow = true, receiveNotifications = true }) {
+    return request('/telegram', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'allow_user',
+        userId,
+        allow,
+        receiveNotifications,
+      }),
+    });
+  },
+
+  async toggleTelegramNotifications({ userId, receiveNotifications }) {
+    return request('/telegram', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'toggle_notifications',
+        userId,
+        receiveNotifications,
+      }),
+    });
+  },
+
   async syncTelegramUpdates() {
     return request('/telegram', {
       method: 'POST',

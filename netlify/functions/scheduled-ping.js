@@ -1,5 +1,6 @@
 const { schedule } = require('@netlify/functions');
 const { connectToDatabase } = require('./lib/mongodb');
+const { notifyPingSuccess } = require('./lib/telegramNotifier');
 
 /**
  * Netlify Scheduled Function: runs automatically every 5 minutes
@@ -37,6 +38,13 @@ const scheduledPingHandler = async (event, context) => {
       source: 'NETLIFY_SCHEDULED_CRON',
       createdAt: new Date(),
     });
+
+    // Notify approved subscribers
+    notifyPingSuccess({
+      latencyMs: responseTimeMs,
+      dbName,
+      source: 'NETLIFY_SCHEDULED_CRON',
+    }).catch((e) => console.error('Scheduled cron telegram notification error:', e.message));
 
     console.log(`✅ Scheduled Ping Success: ${responseTimeMs}ms`);
 

@@ -1,4 +1,5 @@
 ﻿const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
@@ -7,6 +8,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 const PORT = parseInt(process.env.PORT, 10) || 5173;
 const DIST_DIR = path.resolve(__dirname, 'dist');
+const MAX_PAYLOAD_BYTES = 100 * 1024; // 100 KB max payload size to prevent DoS memory exhaustion
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -42,7 +44,7 @@ function getFunctionHandler(functionName) {
   return mod.handler;
 }
 
-// Background Keep-Alive Scheduler (Automated every 5 minutes)
+// Background Keep-Alive Scheduler (Automated every 5 minutes in memory)
 function startKeepAliveScheduler() {
   const { scheduledPingHandler } = require('./netlify/functions/scheduled-ping');
   const INTERVAL_MS = 5 * 60 * 1000;
@@ -90,10 +92,20 @@ function startTelegramPoller() {
   }, 3000);
 }
 
-// Create HTTP Server
-const server = http.createServer(async (req, res) => {
-  const parsedUrl = url.parse(req.url, true);
-  const pathname = parsedUrl.pathname;
+// Request Handler
+async function handleRequest(req, res) {
+  // Catch malformed URLs safely (prevents URIError crashes from malicious paths like /%%)
+  let parsedUrl;
+  try {
+    parsedUrl = url.parse(req.url, true);
+  } catch (err) {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ status: 'error', message: 'Bad Request: Malformed URL' }));
+    return;
+  }
+
+  const pathname = parsedUrl.pathname || '/';
 
   // 1. API Route Handling
   let functionName = null;
@@ -104,6 +116,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (functionName) {
+    // Security: Block public unauthenticated access to scheduled-ping on local server
+    if (functionName === 'scheduled-ping') {
+      const cronSecret = process.env.CRON_SECRET;
+      const providedSecret = req.headers['x-cron-secret'] || parsedUrl.query?.key;
+      if (!cronSecret || providedSecret !== cronSecret) {
+        res.statusCode = 403;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ status: 'error', message: 'Forbidden: scheduled-ping runs internally and cannot be called publicly' }));
+        return;
+      }
+    }
+
     const handler = getFunctionHandler(functionName);
     if (!handler) {
       res.statusCode = 404;
@@ -113,11 +137,22 @@ const server = http.createServer(async (req, res) => {
     }
 
     let body = '';
+    let isPayloadTooLarge = false;
+
     req.on('data', (chunk) => {
       body += chunk;
+      if (body.length > MAX_PAYLOAD_BYTES) {
+        isPayloadTooLarge = true;
+        res.statusCode = 413;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ status: 'error', message: 'Payload Too Large (Maximum 100KB)' }));
+        req.destroy();
+      }
     });
 
     req.on('end', async () => {
+      if (isPayloadTooLarge) return;
+
       const event = {
         httpMethod: req.method,
         headers: req.headers,
@@ -149,13 +184,22 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 2. Static File Serving (from dist/)
-  let safePath = path.normalize(decodeURIComponent(pathname)).replace(/^(\.\.[\/\\])+/, '');
+  // 2. Static File Serving (from dist/) with safe path decoding
+  let safePath;
+  try {
+    safePath = path.normalize(decodeURIComponent(pathname)).replace(/^(\.\.[\/\\])+/, '');
+  } catch (err) {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ status: 'error', message: 'Bad Request: Malformed URI component' }));
+    return;
+  }
+
   if (safePath === '/' || safePath === '\\') {
     safePath = '/index.html';
   }
 
-  let filePath = path.join(DIST_DIR, safePath);
+  const filePath = path.join(DIST_DIR, safePath);
 
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
@@ -177,7 +221,7 @@ const server = http.createServer(async (req, res) => {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-    // Caching headers: 1 year for immutable hashed assets, no-cache for index.html
+    // Caching headers
     if (ext === '.html') {
       res.setHeader('Cache-Control', 'no-cache');
     } else {
@@ -189,7 +233,7 @@ const server = http.createServer(async (req, res) => {
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
   });
-});
+}
 
 // Discover local network Wi-Fi IP address
 function getLocalIp() {
@@ -204,14 +248,42 @@ function getLocalIp() {
   return 'localhost';
 }
 
+// Check for SSL certificates for local HTTPS
+function createServerInstance() {
+  const sslKeyPath = process.env.SSL_KEY_PATH;
+  const sslCertPath = process.env.SSL_CERT_PATH;
+
+  if (sslKeyPath && sslCertPath && fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)) {
+    try {
+      const options = {
+        key: fs.readFileSync(sslKeyPath),
+        cert: fs.readFileSync(sslCertPath),
+      };
+      console.log('🔒 HTTPS SSL certificates loaded successfully.');
+      return { server: https.createServer(options, handleRequest), isHttps: true };
+    } catch (e) {
+      console.error('Failed to initialize HTTPS with provided certificates:', e.message);
+    }
+  }
+
+  return { server: http.createServer(handleRequest), isHttps: false };
+}
+
+const { server, isHttps } = createServerInstance();
+const protocol = isHttps ? 'https' : 'http';
+
 server.listen(PORT, '0.0.0.0', () => {
   const localIp = getLocalIp();
   console.log('\n============================================================');
-  console.log('🚀 Multi-DB Keep Alive Manager Server is Running!');
+  console.log(`🚀 Multi-DB Keep Alive Manager Server is Running (${protocol.toUpperCase()})!`);
   console.log('============================================================');
-  console.log(`🌐 Local:        http://localhost:${PORT}`);
-  console.log(`📡 Wi-Fi / LAN:  http://${localIp}:${PORT}`);
+  console.log(`🌐 Local:        ${protocol}://localhost:${PORT}`);
+  console.log(`📡 Wi-Fi / LAN:  ${protocol}://${localIp}:${PORT}`);
   console.log(`⚙️  Databases:    MongoDB Atlas + PostgreSQL + MySQL`);
+  if (!isHttps) {
+    console.log('⚠️  SECURITY NOTE: Running unencrypted HTTP. On public or shared Wi-Fi,');
+    console.log('   use HTTPS (set SSL_KEY_PATH & SSL_CERT_PATH) or a Caddy/Nginx reverse proxy.');
+  }
   console.log('============================================================\n');
 
   startKeepAliveScheduler();

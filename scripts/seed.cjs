@@ -1,19 +1,30 @@
-const { MongoClient } = require('mongodb');
+﻿const { MongoClient } = require('mongodb');
 const bcrypt = require('bcryptjs');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 async function seed() {
   const uri = process.env.MONGO_URI;
   const dbName = process.env.MONGO_DB_NAME || 'system_reset';
-  const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123456';
+  const adminUsername = process.env.ADMIN_USERNAME;
+  const adminPassword = process.env.ADMIN_PASSWORD;
 
   if (!uri) {
     console.error('❌ Error: MONGO_URI is missing in .env');
     process.exit(1);
   }
 
-  console.log('🔄 Connecting to MongoDB Atlas...');
+  if (!adminUsername || !adminPassword) {
+    console.error('❌ Error: ADMIN_USERNAME and ADMIN_PASSWORD must be configured in .env before running seed.');
+    process.exit(1);
+  }
+
+  if (adminPassword === 'admin123456' || adminPassword === 'password' || adminPassword.length < 8) {
+    console.error('❌ Error: Insecure ADMIN_PASSWORD detected. Please choose a strong password (minimum 8 characters) in .env.');
+    process.exit(1);
+  }
+
+  console.log('📡 Connecting to MongoDB Atlas...');
   const client = new MongoClient(uri);
 
   try {
@@ -38,7 +49,7 @@ async function seed() {
       });
       console.log('✅ Admin user created successfully.');
     } else {
-      console.log(`ℹ️ Admin user "${adminUsername}" already exists.`);
+      console.log(`ℹ️  Admin user "${adminUsername}" already exists.`);
     }
 
     // 2. Ensure settings collection
@@ -54,7 +65,7 @@ async function seed() {
       });
       console.log('✅ Default settings initialized (Keep Alive: ON, Interval: 5m).');
     } else {
-      console.log('ℹ️ Settings already exist:', existingSettings);
+      console.log('ℹ️  Settings already exist.');
     }
 
     // 3. Ensure initial ping log
@@ -68,20 +79,21 @@ async function seed() {
 
       await logsCol.insertOne({
         action: 'PING',
+        target: 'MongoDB',
         status: 'SUCCESS',
         responseTime: pingDuration,
         createdAt: new Date(),
       });
       console.log(`✅ Initial ping log stored (${pingDuration}ms).`);
     } else {
-      console.log(`ℹ️ Existing logs found: ${logsCount} entries.`);
+      console.log(`ℹ️  Existing logs found: ${logsCount} entries.`);
     }
 
-    console.log('\n✨ Database seeding completed successfully!\n');
+    console.log('\n🎉 Database seeding completed successfully!\n');
     console.log(`Admin Username: ${adminUsername}`);
-    console.log(`Admin Password: ${adminPassword}`);
+    console.log('Admin Password: [PROTECTED - stored as salted bcrypt hash]');
   } catch (err) {
-    console.error('❌ Seeding failed:', err);
+    console.error('❌ Seeding failed:', err.message);
     process.exit(1);
   } finally {
     await client.close();

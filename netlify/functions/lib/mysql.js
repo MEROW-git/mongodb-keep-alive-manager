@@ -1,12 +1,42 @@
 ﻿const mysql = require('mysql2/promise');
+const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 let cachedPool = null;
 
 function isMysqlConfigured() {
   const url = process.env.mysql_url || process.env.MYSQL_URL || process.env.MYSQL_URI;
   return Boolean(url && url.trim());
+}
+
+function getSslConfig(isLocal) {
+  if (isLocal) return undefined;
+
+  const caPath = process.env.MYSQL_SSL_CA_PATH || process.env.DB_SSL_CA_PATH;
+  const caCert = process.env.MYSQL_SSL_CA_CERT || process.env.DB_SSL_CA_CERT;
+  const rejectUnauthorizedEnv = process.env.MYSQL_SSL_REJECT_UNAUTHORIZED || process.env.DB_SSL_REJECT_UNAUTHORIZED;
+
+  let ca = undefined;
+  if (caPath && fs.existsSync(caPath)) {
+    try {
+      ca = fs.readFileSync(caPath, 'utf8');
+    } catch (e) {
+      console.error(`Failed to read MySQL CA certificate from ${caPath}:`, e.message);
+    }
+  } else if (caCert) {
+    ca = caCert;
+  }
+
+  // If CA is provided, strictly enforce verification (true).
+  // Otherwise, respect DB_SSL_REJECT_UNAUTHORIZED if explicitly set to true.
+  const rejectUnauthorized = ca ? true : (rejectUnauthorizedEnv === 'true');
+
+  if (!rejectUnauthorized) {
+    console.warn('[SECURITY NOTICE] MySQL TLS is running with rejectUnauthorized: false. Provide a CA certificate via DB_SSL_CA_PATH or set DB_SSL_REJECT_UNAUTHORIZED=true for strict verification.');
+  }
+
+  return ca ? { rejectUnauthorized: true, ca } : { rejectUnauthorized };
 }
 
 function getMysqlPool() {
@@ -22,7 +52,6 @@ function getMysqlPool() {
   let connectionString = rawUrl.trim();
   const isLocal = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
 
-  let ssl = isLocal ? undefined : { rejectUnauthorized: false };
   if (!isLocal) {
     try {
       const u = new URL(connectionString);
@@ -36,7 +65,7 @@ function getMysqlPool() {
 
   cachedPool = mysql.createPool({
     uri: connectionString,
-    ssl,
+    ssl: getSslConfig(isLocal),
     waitForConnections: true,
     connectionLimit: 5,
     queueLimit: 0,
@@ -62,7 +91,7 @@ async function pingMysql() {
   const pool = getMysqlPool();
   const pingStart = Date.now();
 
-  // Use backticks or non-reserved aliases (current_time is a reserved keyword in MySQL)
+  // Use non-reserved alias ping_time (current_time is a reserved keyword in MySQL)
   const [rows] = await pool.query('SELECT NOW() AS ping_time, DATABASE() AS ping_db, 1 AS alive;');
   const responseTimeMs = Date.now() - pingStart;
 
@@ -80,4 +109,5 @@ module.exports = {
   isMysqlConfigured,
   getMysqlPool,
   pingMysql,
+  getSslConfig,
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Sliders, Save, Database, ShieldCheck, CheckCircle2, AlertCircle, Copy, Check } from 'lucide-react';
 import api from '../services/api';
 
@@ -215,12 +215,21 @@ export default function Settings({ onSettingsUpdated }) {
             <h2 className="text-sm font-semibold text-white">Cron & Webhook Keep-Alive Trigger</h2>
           </div>
           <p className="text-xs text-gray-400 leading-relaxed">
-            The application is 100% serverless with zero background processes. Ping operations can be triggered automatically by Netlify Scheduled Functions or by external cron services (such as UptimeRobot, cron-job.org, or GitHub Actions) using the endpoint:
+            Automated keep-alive pings run internally every 5 minutes. You can also trigger keep-alive cycles from external monitoring services (such as UptimeRobot, cron-job.org, or curl) using the secure header-authenticated endpoint:
           </p>
-          <div className="p-3 rounded-xl bg-gray-950 border border-gray-800 font-mono text-xs text-mongo flex items-center justify-between">
-            <code>/.netlify/functions/ping?key=CRON_SECRET</code>
-            <span className="text-[10px] text-gray-500 uppercase font-sans">HTTP GET/POST</span>
+          <div className="p-3.5 rounded-xl bg-gray-950 border border-gray-800 space-y-2 font-mono text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-gray-300">
+              <span className="text-gray-500 font-sans">Endpoint:</span>
+              <code className="text-mongo">POST /api/ping</code>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-gray-300">
+              <span className="text-gray-500 font-sans">Header:</span>
+              <code className="text-sky-400">x-cron-secret: YOUR_CRON_SECRET</code>
+            </div>
           </div>
+          <p className="text-[11px] text-gray-500">
+            🔒 <strong>Security best practice:</strong> Transmitting secrets via HTTP request headers prevents tokens from being recorded in web server access logs, browser history, or proxy referrer headers.
+          </p>
         </div>
 
       </form>

@@ -10,6 +10,28 @@ const { notifyPingSuccess } = require('./lib/telegramNotifier');
  */
 const scheduledPingHandler = async (event = {}, context = {}) => {
   console.log('⚡ Keep-Alive ping handler triggered...');
+  // If invoked via HTTP request (rather than internal cron runner), require valid CRON_SECRET authorization
+  const isNetlifyScheduled = event.type === 'schedule' || Boolean(context?.clientContext?.custom?.scheduled);
+  if (!isNetlifyScheduled && event.httpMethod) {
+    const cronSecret = process.env.CRON_SECRET;
+    const providedSecret =
+      event.headers?.['x-cron-secret'] ||
+      event.headers?.['X-Cron-Secret'] ||
+      event.queryStringParameters?.key;
+
+    if (!cronSecret || providedSecret !== cronSecret) {
+      console.warn('[SECURITY] Rejected unauthenticated HTTP call to scheduled-ping');
+      return {
+        statusCode: 401,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'error',
+          message: 'Unauthorized: scheduled-ping cannot be invoked publicly without valid cron secret',
+        }),
+      };
+    }
+  }
+
   const mongoDbName = process.env.MONGO_DB_NAME || 'system_reset';
   const pingResults = [];
 

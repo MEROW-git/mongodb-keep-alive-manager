@@ -1,14 +1,23 @@
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
+﻿const jwt = require('jsonwebtoken');
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-cron-secret',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-cron-secret, x-telegram-bot-api-secret-token',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Content-Type': 'application/json',
 };
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_mongodb_keep_alive_2026';
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || typeof secret !== 'string' || secret.trim().length < 16) {
+    throw new Error(
+      'FATAL: JWT_SECRET environment variable is missing, empty, or too short (minimum 16 characters required). Refusing to use insecure hardcoded fallback.'
+    );
+  }
+  return secret.trim();
+}
 
 function jsonResponse(statusCode, data) {
   return {
@@ -19,19 +28,20 @@ function jsonResponse(statusCode, data) {
 }
 
 function generateToken(user) {
+  const secret = getJwtSecret();
   return jwt.sign(
     {
       id: user._id,
       username: user.username,
       role: user.role || 'admin',
     },
-    JWT_SECRET,
+    secret,
     { expiresIn: '7d' }
   );
 }
 
 function verifyToken(authHeader) {
-  if (!authHeader) {
+  if (!authHeader || typeof authHeader !== 'string') {
     return null;
   }
   const parts = authHeader.split(' ');
@@ -40,7 +50,8 @@ function verifyToken(authHeader) {
   }
   const token = parts[1];
   try {
-    return jwt.verify(token, JWT_SECRET);
+    const secret = getJwtSecret();
+    return jwt.verify(token, secret);
   } catch (err) {
     return null;
   }
@@ -51,4 +62,5 @@ module.exports = {
   jsonResponse,
   generateToken,
   verifyToken,
+  getJwtSecret,
 };

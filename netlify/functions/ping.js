@@ -1,4 +1,4 @@
-﻿const { connectToDatabase } = require('./lib/mongodb');
+const { connectToDatabase } = require('./lib/mongodb');
 const { isPostgresConfigured, pingPostgres } = require('./lib/postgres');
 const { isMysqlConfigured, pingMysql } = require('./lib/mysql');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
@@ -23,9 +23,10 @@ exports.handler = async (event, context) => {
 
   const cronSecret = process.env.CRON_SECRET;
   const providedSecret =
-    event.queryStringParameters?.key ||
     event.headers['x-cron-secret'] ||
-    event.headers['X-Cron-Secret'];
+    event.headers['X-Cron-Secret'] ||
+    (authHeader && cronSecret && authHeader === "Bearer " + cronSecret ? cronSecret : null) ||
+    event.queryStringParameters?.key;
 
   const isNetlifyScheduled = event.type === 'schedule' || Boolean(context?.clientContext?.custom?.scheduled);
   const isAuthorizedCron = Boolean(cronSecret && providedSecret && providedSecret === cronSecret);

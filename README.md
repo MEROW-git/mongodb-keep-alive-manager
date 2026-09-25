@@ -1,4 +1,4 @@
-﻿# ⚡ Multi-Database Keep-Alive Manager & Admin Dashboard
+# ⚡ Multi-Database Keep-Alive Manager & Admin Dashboard
 
 > A high-performance, lightweight, daemonless keep-alive manager and real-time dashboard designed for **MongoDB Atlas**, **PostgreSQL**, and **MySQL**. Prevents free-tier and serverless databases from pausing, sleeping, or spinning down due to inactivity.
 
@@ -7,10 +7,10 @@
 ## 🌟 Highlights
 
 - **Multi-Database Support**: Automated keep-alive pings for **MongoDB Atlas**, **PostgreSQL** (Aiven, Neon, Supabase, Render), and **MySQL** (Aiven, PlanetScale, TiDB, Clever Cloud).
-- **Raspberry Pi & Local Wi-Fi Ready**: Host on a Raspberry Pi, mini-PC, or home server and access the dashboard from any phone, laptop, or computer connected to the same Wi-Fi router.
-- **24/7 Autonomous Background Pings**: Built-in scheduler automatically executes pings every 5 minutes—no browser tab needed.
-- **Telegram Bot Integration**: Remote management via Telegram bot (`/status`, `/ping`, instant touch controls, access approval gate, ban list, and real-time failure alerts).
-- **Zero-Leak Security**: Strict server-side credential isolation. Connection strings, passwords, and tokens never leak into client bundles.
+- **Raspberry Pi & Local Wi-Fi Ready**: Host on a Raspberry Pi, mini-PC, or home server and access the dashboard securely from any phone, laptop, or computer on your home router.
+- **24/7 Autonomous Background Pings**: Built-in scheduler automatically executes pings every 5 minutes in memory—no browser tab or external runner required.
+- **Telegram Bot Remote Management**: Control and monitor your databases via Telegram (`/status`, `/ping`, interactive touch controls, subscriber access approval gate, ban management, and failure alerts).
+- **Hardened Zero-Leak Security**: Strict server-side credential isolation, bruteforce login throttling, request body size limits, authenticated Telegram webhooks, and header-based cron authorization.
 - **Flexible Deployment**: Runs anywhere—Raspberry Pi OS, Debian/Ubuntu, Docker, local Node.js, or Netlify Serverless.
 
 ---
@@ -21,7 +21,7 @@
  ┌────────────────────────────────────────────────────────┐
  │   Local Wi-Fi Network / Same Router (Phones, Laptops)  │
  └───────────────────────────┬────────────────────────────┘
-                             │  HTTP (Port 5173)
+                             │  HTTPS (Port 5173 or 443)
                              ▼
  ┌────────────────────────────────────────────────────────┐
  │          Raspberry Pi / Home Server (0.0.0.0)          │
@@ -47,15 +47,15 @@
 
 ## 🍓 Raspberry Pi / Local Wi-Fi Setup Guide
 
-This guide is for hosting the bot on a Raspberry Pi connected to your home Wi-Fi router so you can access the dashboard from any device on your local network.
+This guide walks you through hosting the bot on a Raspberry Pi connected to your home Wi-Fi router so you can manage your databases from any device on your local network.
 
 ### 1. Prerequisites on Raspberry Pi
 Ensure Node.js (v18 or v20+) and Git are installed on your Raspberry Pi:
 ```bash
-# Update packages
+# Update package repositories
 sudo apt update && sudo apt upgrade -y
 
-# Install Node.js (via NodeSource if not already installed)
+# Install Node.js (v20 LTS) & Git
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs git
 ```
@@ -99,17 +99,30 @@ postgresql_db=defaultdb
 mysql_url=mysql://<user>:<password>@<host>:<port>/<database>
 mysql_db=mysql
 
-# 🔐 Security & Admin Login
-JWT_SECRET=your_super_secret_jwt_random_key_here
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your_secure_password_here
+# 🔒 TLS / SSL Certificate Validation
+DB_SSL_REJECT_UNAUTHORIZED=true
+# Optional custom CA path for databases with private CA certs (e.g. Aiven ca.pem):
+# DB_SSL_CA_PATH=./ca.pem
 
-# ⚡ Keep-Alive Webhook Trigger Token
+# 🔐 Security & Admin Login (Required: minimum 16 random characters)
+JWT_SECRET=generate_with_openssl_rand_hex_32
+ADMIN_USERNAME=your_admin_username
+ADMIN_PASSWORD=your_strong_admin_password_min_12_chars
+
+# ⚡ Secret Token for Cron Webhook Triggers (Sent via header: "x-cron-secret")
 CRON_SECRET=your_custom_cron_secret_trigger_token
 
 # 🤖 Telegram Bot Token (from @BotFather)
 telegram_bot=1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ
+
+# 🛡️ Telegram Webhook Secret Token (Sent by Telegram via header "X-Telegram-Bot-Api-Secret-Token")
+TELEGRAM_WEBHOOK_SECRET=your_telegram_webhook_secret_token_here
 ```
+
+> **Security Tip**: Generate a strong JWT secret using OpenSSL:
+> ```bash
+> openssl rand -hex 32
+> ```
 
 ---
 
@@ -147,7 +160,7 @@ npm start
 The server will output:
 ```text
 ============================================================
-🚀 Multi-DB Keep Alive Manager Server is Running!
+🚀 Multi-DB Keep Alive Manager Server is Running (HTTP)!
 ============================================================
 🌐 Local:        http://localhost:5173
 📡 Wi-Fi / LAN:  http://192.168.1.45:5173
@@ -157,15 +170,30 @@ The server will output:
 Now, open your phone or PC connected to the same Wi-Fi and browse to:
 **`http://192.168.1.45:5173`**
 
-#### Option B: Development Mode
+#### Option B: Encrypted HTTPS on Local Wi-Fi (Recommended for Security)
+To protect login passwords and JWT sessions from local network packet sniffing on Wi-Fi, enable HTTPS:
+
+1. Generate a local SSL certificate using `mkcert` or `openssl`:
+   ```bash
+   openssl req -x509 -newkey rsa:2048 -nodes -sha256 -subj '/CN=raspberrypi.local' \
+     -keyout server.key -out server.crt -days 365
+   ```
+2. Add paths to your `.env`:
+   ```env
+   SSL_KEY_PATH=./server.key
+   SSL_CERT_PATH=./server.crt
+   ```
+3. Run `npm start`. The server will automatically run with TLS encryption (`https://192.168.1.45:5173`).
+
+Alternatively, use **Caddy** as a reverse proxy for automatic HTTPS with a single command:
 ```bash
-npm run dev -- --host
+caddy reverse-proxy --from :443 --to :5173
 ```
 
 ---
 
-### 7. Run 24/7 on Boot with PM2 (Optional)
-To ensure the bot keeps running automatically even if your Raspberry Pi reboots or loses power:
+### 7. Run 24/7 on Boot with PM2
+To keep the server and keep-alive pinger running in the background continuously:
 
 ```bash
 # Install PM2 process manager
@@ -174,12 +202,10 @@ sudo npm install -g pm2
 # Start the server with PM2
 pm2 start server.cjs --name "keepdb-alive"
 
-# Save PM2 process list
+# Save process list and enable system startup
 pm2 save
-
-# Generate and configure systemd startup service
 pm2 startup
-# (Run the sudo command that PM2 prints on screen)
+# (Run the sudo command that PM2 displays on screen)
 ```
 
 Useful PM2 commands:
@@ -189,26 +215,6 @@ pm2 logs keepdb-alive    # View live logs and ping times
 pm2 restart keepdb-alive # Restart server
 pm2 stop keepdb-alive    # Stop server
 ```
-
----
-
-## ☁️ Cloud Deployment (Netlify)
-
-You can also deploy to Netlify for 100% free serverless hosting:
-
-1. Push your repository to **GitHub**.
-2. Connect your repo in the [Netlify Dashboard](https://app.netlify.com/).
-3. Netlify automatically reads configuration from `netlify.toml`:
-   - **Build Command**: `npm run build`
-   - **Publish Directory**: `dist`
-   - **Functions Directory**: `netlify/functions`
-4. Set your environment variables in Netlify: **Site Settings > Environment Variables**:
-   - `MONGO_URI`, `MONGO_DB_NAME`, `WEBADMIN_COLLECTION`
-   - `postgresql_url`, `postgresql_db` (optional)
-   - `mysql_url`, `mysql_db` (optional)
-   - `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`
-   - `CRON_SECRET`, `telegram_bot`
-5. Netlify's scheduled cron runs `scheduled-ping.js` every 5 minutes automatically.
 
 ---
 
@@ -227,15 +233,45 @@ The bot includes full Telegram integration for mobile notifications and controls
 3. Click **Allow Access** to approve them, or **Revoke Access** to block them.
 4. Admins can ban unauthorized or abusive users directly from the dashboard.
 
+### Setting Up Telegram Webhook (Authenticated)
+When setting your webhook URL with Telegram, always include `secret_token`:
+```bash
+curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://<your-host>/api/telegram?action=webhook",
+    "secret_token": "YOUR_TELEGRAM_WEBHOOK_SECRET"
+  }'
+```
+Our backend verifies `X-Telegram-Bot-Api-Secret-Token` on every incoming webhook to prevent spoofed messages.
+
 ---
 
-## 🔐 Security Protections
+## ⚡ External Keep-Alive Webhook Trigger
 
-- **No Client-Side Secrets**: All database URLs and passwords remain strictly on the backend. Vite never bundles `.env` variables without the `VITE_` prefix.
-- **Masked Database URIs**: API responses mask credentials (`mongodb+srv://••••••••:••••••••@cluster...`).
-- **NoSQL Injection Guard**: Strict type checks prevent query selector injection on authentication endpoints.
-- **Protected Cron Webhooks**: External ping triggers require a secret key (`?key=CRON_SECRET`).
-- **Sanitized Error Responses**: Internal database errors, connection strings, and stack traces are suppressed in API responses.
+To trigger keep-alive cycles from external monitoring services (e.g. UptimeRobot, cron-job.org, or curl):
+
+### Recommended (Secure Header):
+```bash
+curl -X POST https://<your-host>/api/ping \
+  -H "x-cron-secret: YOUR_CRON_SECRET"
+```
+*(Sending secrets via request headers prevents tokens from being recorded in web server logs, browser history, or proxy referrers).*
+
+---
+
+## 🔐 Security Protections Summary
+
+1. **No Hardcoded JWT Fallback**: Refuses to start or sign tokens if `JWT_SECRET` is missing or shorter than 16 characters.
+2. **No Default Admin Credentials**: Auto-seeding requires explicit environment variables and rejects weak/default passwords (`admin123456`).
+3. **Authenticated Telegram Webhook**: Incoming webhooks require matching `X-Telegram-Bot-Api-Secret-Token`.
+4. **Protected Scheduled Ping**: `/api/scheduled-ping` is blocked from unauthenticated public HTTP access.
+5. **Local HTTPS Support**: Native TLS support via `SSL_KEY_PATH` & `SSL_CERT_PATH` for encrypted Wi-Fi traffic.
+6. **Configurable DB TLS Validation**: Full support for custom CA certificates (`DB_SSL_CA_PATH`) with strict validation.
+7. **DoS Prevention & Rate Limiting**: 100KB request body size limit and 5-attempt brute-force login throttling with 15-minute lockouts.
+8. **Malformed URL Crash Guard**: Safe URI normalization with try/catch error handling preventing `URIError` crashes.
+9. **Password Redaction in Scripts**: Plaintext passwords are never printed to terminal stdout during seeding or testing.
+10. **Header-Based Secret Authorization**: Recommends and prioritizes HTTP request headers over query strings.
 
 ---
 
@@ -248,10 +284,10 @@ The bot includes full Telegram integration for mobile notifications and controls
 | `npm start` | Runs standalone lightweight Node.js server with built-in 5-min scheduler. |
 | `npm run test:db` | Tests live connections to MongoDB, PostgreSQL, and MySQL. |
 | `npm run test:fn` | Tests all 6 backend serverless functions locally. |
-| `npm run seed` | Seeds initial admin user credentials into MongoDB. |
+| `npm run seed` | Seeds initial admin user credentials into MongoDB (password redacted). |
 
 ---
 
 <div align="center">
-  <p>Built for reliable, worry-free database keep-alive management on Raspberry Pi and Cloud.</p>
+  <p>Built for secure, reliable, worry-free database keep-alive management on Raspberry Pi and Cloud.</p>
 </div>

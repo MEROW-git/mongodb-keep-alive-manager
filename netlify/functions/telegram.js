@@ -1,4 +1,4 @@
-const { connectToDatabase } = require('./lib/mongodb');
+﻿const { connectToDatabase } = require('./lib/mongodb');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 require('dotenv').config();
 
@@ -299,14 +299,28 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Handle Telegram Incoming Webhook
+  // Handle Telegram Incoming Webhook (Strictly authenticated via secret token)
   const isWebhook = event.queryStringParameters?.action === 'webhook' || event.path?.includes('webhook');
   if (isWebhook && event.httpMethod === 'POST') {
+    const configuredWebhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET || process.env.CRON_SECRET;
+    const providedWebhookSecret =
+      event.headers['x-telegram-bot-api-secret-token'] ||
+      event.headers['X-Telegram-Bot-Api-Secret-Token'] ||
+      event.queryStringParameters?.secret;
+
+    if (!configuredWebhookSecret || providedWebhookSecret !== configuredWebhookSecret) {
+      console.warn('[SECURITY] Rejected unauthenticated Telegram webhook request');
+      return jsonResponse(401, {
+        status: 'error',
+        message: 'Unauthorized: Invalid or missing Telegram webhook secret token',
+      });
+    }
+
     let update = {};
     try {
       update = JSON.parse(event.body || '{}');
     } catch (e) {
-      return jsonResponse(200, { ok: true });
+      return jsonResponse(400, { status: 'error', message: 'Malformed JSON payload' });
     }
 
     const message = update.message || update.edited_message;
@@ -319,8 +333,8 @@ exports.handler = async (event, context) => {
       await processTelegramMessage(db, message);
       return jsonResponse(200, { ok: true });
     } catch (err) {
-      console.error('Telegram webhook error:', err);
-      return jsonResponse(200, { ok: true, error: err.message });
+      console.error('Telegram webhook error:', err.message);
+      return jsonResponse(500, { status: 'error', message: 'Webhook processing failed' });
     }
   }
 

@@ -4,6 +4,35 @@ const path = require('path');
 
 let cachedPool = null;
 
+function resolveCaCertificate() {
+  const rootDir = path.resolve(__dirname, '../../../');
+  const caPath = process.env.PG_SSL_CA_PATH || process.env.DB_SSL_CA_PATH;
+  const caCert = process.env.PG_SSL_CA_CERT || process.env.DB_SSL_CA_CERT;
+
+  if (caCert && caCert.trim()) {
+    return caCert.trim();
+  }
+
+  const candidates = [
+    caPath ? (path.isAbsolute(caPath) ? caPath : path.resolve(rootDir, caPath)) : null,
+    caPath ? path.resolve(process.cwd(), caPath) : null,
+    path.resolve(rootDir, 'ca.pem'),
+    path.resolve(process.cwd(), 'ca.pem'),
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      try {
+        return fs.readFileSync(candidate, 'utf8');
+      } catch (e) {
+        console.error(`Failed to read PostgreSQL CA certificate from ${candidate}:`, e.message);
+      }
+    }
+  }
+
+  return undefined;
+}
+
 function isPostgresConfigured() {
   require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), override: true });
   const url = process.env.postgresql_url || process.env.POSTGRESQL_URL;
@@ -15,27 +44,14 @@ function getSslConfig(isLocal) {
 
   require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), override: true });
 
-  const caPath = process.env.PG_SSL_CA_PATH || process.env.DB_SSL_CA_PATH;
-  const caCert = process.env.PG_SSL_CA_CERT || process.env.DB_SSL_CA_CERT;
+  const ca = resolveCaCertificate();
   const rejectUnauthorizedEnv = process.env.PG_SSL_REJECT_UNAUTHORIZED || process.env.DB_SSL_REJECT_UNAUTHORIZED;
 
-  let ca = undefined;
-  if (caPath && fs.existsSync(caPath)) {
-    try {
-      ca = fs.readFileSync(caPath, 'utf8');
-    } catch (e) {
-      console.error(`Failed to read PostgreSQL CA certificate from ${caPath}:`, e.message);
-    }
-  } else if (caCert) {
-    ca = caCert;
-  }
-
-  // If CA is provided, strictly enforce verification (true).
-  // Otherwise, respect DB_SSL_REJECT_UNAUTHORIZED if explicitly provided.
+  // If CA is available or explicitly set to true, enable strict verification
   const rejectUnauthorized = ca ? true : (rejectUnauthorizedEnv === 'true');
 
   if (!rejectUnauthorized) {
-    console.warn('[SECURITY NOTICE] PostgreSQL TLS is running with rejectUnauthorized: false. Provide a CA certificate via DB_SSL_CA_PATH or set DB_SSL_REJECT_UNAUTHORIZED=true for strict verification.');
+    console.warn('[SECURITY NOTICE] PostgreSQL TLS is running with rejectUnauthorized: false. Provide a CA certificate (ca.pem) or set DB_SSL_REJECT_UNAUTHORIZED=true for strict verification.');
   }
 
   return ca ? { rejectUnauthorized: true, ca } : { rejectUnauthorized };
@@ -75,7 +91,7 @@ function getPostgresPool() {
   cachedPool.on('error', (err) => {
     console.warn('Unexpected idle PostgreSQL client error:', err.message);
     if (err.message && err.message.includes('certificate')) {
-      cachedPool = null; // Recreate pool on next ping
+      cachedPool = null;
     }
   });
 
@@ -120,7 +136,7 @@ async function pingPostgres() {
     };
   } catch (err) {
     if (err.message && err.message.includes('certificate')) {
-      cachedPool = null; // Invalidate pool so it recreates with updated SSL settings
+      cachedPool = null;
     }
     throw err;
   } finally {
@@ -133,4 +149,5 @@ module.exports = {
   getPostgresPool,
   pingPostgres,
   getSslConfig,
+  resolveCaCertificate,
 };

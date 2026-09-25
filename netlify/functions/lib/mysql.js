@@ -4,6 +4,35 @@ const path = require('path');
 
 let cachedPool = null;
 
+function resolveCaCertificate() {
+  const rootDir = path.resolve(__dirname, '../../../');
+  const caPath = process.env.MYSQL_SSL_CA_PATH || process.env.DB_SSL_CA_PATH;
+  const caCert = process.env.MYSQL_SSL_CA_CERT || process.env.DB_SSL_CA_CERT;
+
+  if (caCert && caCert.trim()) {
+    return caCert.trim();
+  }
+
+  const candidates = [
+    caPath ? (path.isAbsolute(caPath) ? caPath : path.resolve(rootDir, caPath)) : null,
+    caPath ? path.resolve(process.cwd(), caPath) : null,
+    path.resolve(rootDir, 'ca.pem'),
+    path.resolve(process.cwd(), 'ca.pem'),
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      try {
+        return fs.readFileSync(candidate, 'utf8');
+      } catch (e) {
+        console.error(`Failed to read MySQL CA certificate from ${candidate}:`, e.message);
+      }
+    }
+  }
+
+  return undefined;
+}
+
 function isMysqlConfigured() {
   require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), override: true });
   const url = process.env.mysql_url || process.env.MYSQL_URL || process.env.MYSQL_URI;
@@ -15,27 +44,14 @@ function getSslConfig(isLocal) {
 
   require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), override: true });
 
-  const caPath = process.env.MYSQL_SSL_CA_PATH || process.env.DB_SSL_CA_PATH;
-  const caCert = process.env.MYSQL_SSL_CA_CERT || process.env.DB_SSL_CA_CERT;
+  const ca = resolveCaCertificate();
   const rejectUnauthorizedEnv = process.env.MYSQL_SSL_REJECT_UNAUTHORIZED || process.env.DB_SSL_REJECT_UNAUTHORIZED;
 
-  let ca = undefined;
-  if (caPath && fs.existsSync(caPath)) {
-    try {
-      ca = fs.readFileSync(caPath, 'utf8');
-    } catch (e) {
-      console.error(`Failed to read MySQL CA certificate from ${caPath}:`, e.message);
-    }
-  } else if (caCert) {
-    ca = caCert;
-  }
-
-  // If CA is provided, strictly enforce verification (true).
-  // Otherwise, respect DB_SSL_REJECT_UNAUTHORIZED if explicitly set to true.
+  // If CA is available or explicitly set to true, enable strict verification
   const rejectUnauthorized = ca ? true : (rejectUnauthorizedEnv === 'true');
 
   if (!rejectUnauthorized) {
-    console.warn('[SECURITY NOTICE] MySQL TLS is running with rejectUnauthorized: false. Provide a CA certificate via DB_SSL_CA_PATH or set DB_SSL_REJECT_UNAUTHORIZED=true for strict verification.');
+    console.warn('[SECURITY NOTICE] MySQL TLS is running with rejectUnauthorized: false. Provide a CA certificate (ca.pem) or set DB_SSL_REJECT_UNAUTHORIZED=true for strict verification.');
   }
 
   return ca ? { rejectUnauthorized: true, ca } : { rejectUnauthorized };
@@ -115,7 +131,7 @@ async function pingMysql() {
     };
   } catch (err) {
     if (err.message && err.message.includes('certificate')) {
-      cachedPool = null; // Recreate pool on next ping with updated SSL config
+      cachedPool = null;
     }
     throw err;
   }
@@ -126,4 +142,5 @@ module.exports = {
   getMysqlPool,
   pingMysql,
   getSslConfig,
+  resolveCaCertificate,
 };

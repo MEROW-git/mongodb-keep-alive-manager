@@ -253,14 +253,14 @@ export default function TelegramBot() {
     <div className="space-y-6 max-w-6xl mx-auto">
       
       {/* Top Banner / Bot Status Header */}
-      <div className="glass-panel rounded-2xl p-6 bg-cardBg/90 border border-gray-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.2)]">
-            <Bot className="w-6 h-6" />
+      <div className="glass-panel rounded-2xl p-4 sm:p-6 bg-cardBg/90 border border-gray-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 shadow-[0_0_20px_rgba(59,130,246,0.2)]">
+            <Bot className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <div className="flex items-center space-x-2.5">
-              <h1 className="text-xl font-bold text-white">Telegram Bot Control</h1>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-lg sm:text-xl font-bold text-white">Telegram Bot Control</h1>
               <span
                 className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                   isConnected
@@ -279,9 +279,9 @@ export default function TelegramBot() {
         </div>
 
         {/* Bot Identity Details Pill & Sync Controls */}
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           {botInfo && (
-            <div className="flex items-center space-x-3 bg-gray-900/90 border border-gray-800/90 px-3.5 py-2 rounded-xl text-xs font-mono">
+            <div className="flex items-center space-x-3 bg-gray-900/90 border border-gray-800/90 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-mono">
               <div>
                 <div className="text-white font-bold">{botInfo.first_name}</div>
                 <a
@@ -301,7 +301,7 @@ export default function TelegramBot() {
             onClick={handleSyncUpdates}
             disabled={isSyncing}
             title="Sync Telegram updates from server"
-            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-medium border border-gray-700 transition"
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-medium border border-gray-700 transition shrink-0"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing || isLoading ? 'animate-spin text-mongo' : ''}`} />
             <span>{isSyncing ? 'Syncing...' : 'Sync Updates'}</span>
@@ -328,10 +328,10 @@ export default function TelegramBot() {
       )}
 
       {/* DETECTED TELEGRAM USERS / SUBSCRIBERS TABLE WITH ACCESS APPROVAL */}
-      <div className="glass-panel rounded-2xl p-6 bg-cardBg/90 border border-gray-800/80 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div className="glass-panel rounded-2xl p-4 sm:p-6 bg-cardBg/90 border border-gray-800/80 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded-xl bg-mongo/10 border border-mongo/30 text-mongo">
+            <div className="p-2 rounded-xl bg-mongo/10 border border-mongo/30 text-mongo shrink-0">
               <Users className="w-4 h-4" />
             </div>
             <div>
@@ -339,7 +339,7 @@ export default function TelegramBot() {
                 <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
                   Detected Telegram Users & Access Approvals
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-mongo/20 text-mongo border border-mongo/30">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-mongo/20 text-mongo border border-mongo/30 shrink-0">
                   {detectedUsers.length} detected
                 </span>
               </div>
@@ -352,209 +352,356 @@ export default function TelegramBot() {
           <button
             onClick={handleSyncUpdates}
             disabled={isSyncing}
-            className="self-start sm:self-auto px-3 py-1.5 rounded-lg bg-gray-900 hover:bg-gray-800 border border-gray-800 text-xs font-medium text-gray-300 hover:text-white transition flex items-center space-x-1.5"
+            className="self-start sm:self-auto px-3 py-1.5 rounded-lg bg-gray-900 hover:bg-gray-800 border border-gray-800 text-xs font-medium text-gray-300 hover:text-white transition flex items-center space-x-1.5 shrink-0"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-mongo' : ''}`} />
             <span>Refresh Users</span>
           </button>
         </div>
 
-        <div className="rounded-xl border border-gray-800 overflow-hidden">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#0B1120] text-gray-400 font-mono text-[10px] uppercase border-b border-gray-800">
-              <tr>
-                <th className="py-2.5 px-3">Telegram User</th>
-                <th className="py-2.5 px-3">Recent Activity</th>
-                <th className="py-2.5 px-3">Access &amp; Alerts</th>
-                <th className="py-2.5 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800/60 font-mono text-[11px]">
-              {detectedUsers.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="py-8 text-center text-gray-500 font-sans text-xs">
-                    <div className="max-w-md mx-auto space-y-2">
-                      <p className="text-gray-400 font-medium">No Telegram users detected yet.</p>
-                      <p className="text-[11px] text-gray-500">
-                        Open Telegram, search for{' '}
-                        <a
-                          href={`https://t.me/${botInfo?.username || 'meow_db_notification_bot'}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-400 underline font-mono"
-                        >
-                          @{botInfo?.username || 'meow_db_notification_bot'}
-                        </a>{' '}
-                        and send <code className="text-mongo bg-gray-900 px-1 py-0.5 rounded">/start</code>.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                detectedUsers.map((user) => {
-                  const isProcessing = processingUserId === user.userId;
+        {detectedUsers.length === 0 ? (
+          <div className="p-8 text-center text-gray-500 font-sans text-xs rounded-xl border border-gray-800 bg-[#0B1120]/40">
+            <div className="max-w-md mx-auto space-y-2">
+              <p className="text-gray-400 font-medium">No Telegram users detected yet.</p>
+              <p className="text-[11px] text-gray-500">
+                Open Telegram, search for{' '}
+                <a
+                  href={`https://t.me/${botInfo?.username || 'meow_db_notification_bot'}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-400 underline font-mono"
+                >
+                  @{botInfo?.username || 'meow_db_notification_bot'}
+                </a>{' '}
+                and send <code className="text-mongo bg-gray-900 px-1 py-0.5 rounded">/start</code>.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Mobile View (< sm): Touch-Friendly Cards */}
+            <div className="block sm:hidden space-y-3">
+              {detectedUsers.map((user) => {
+                const isProcessing = processingUserId === user.userId;
 
-                  return (
-                    <tr key={user.id} className="hover:bg-gray-800/30 transition">
-                      {/* 1. User & Identity */}
-                      <td className="py-3 px-3 font-sans">
-                        <div className="flex items-center space-x-2.5">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-mongo/20 to-blue-500/20 border border-mongo/30 flex items-center justify-center text-mongo font-bold text-xs shrink-0">
-                            {(user.displayName || user.username || 'U')[0].toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-semibold text-white truncate max-w-[140px] flex items-center space-x-1">
-                              <span>{user.displayName}</span>
-                              {user.isAllowed && (
-                                <span title="Authorized user" className="text-mongo text-xs">✓</span>
-                              )}
-                            </div>
-                            <div className="flex items-center space-x-1 text-[10px] text-gray-400 font-mono">
-                              {user.username && <span className="text-blue-400 truncate max-w-[90px]">@{user.username}</span>}
-                              <span>•</span>
-                              <span className="text-gray-300">ID: {user.userId}</span>
-                              <button
-                                onClick={() => handleCopy(user.userId)}
-                                title="Copy User ID"
-                                className="text-gray-500 hover:text-mongo transition p-0.5"
-                              >
-                                {copiedId === user.userId ? (
-                                  <Check className="w-2.5 h-2.5 text-mongo" />
-                                ) : (
-                                  <Copy className="w-2.5 h-2.5" />
-                                )}
-                              </button>
-                            </div>
-                          </div>
+                return (
+                  <div key={user.id} className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800 space-y-3">
+                    {/* User Info & Status Header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center space-x-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-mongo/20 to-blue-500/20 border border-mongo/30 flex items-center justify-center text-mongo font-bold text-xs shrink-0">
+                          {(user.displayName || user.username || 'U')[0].toUpperCase()}
                         </div>
-                      </td>
-
-                      {/* 2. Recent Message & Time */}
-                      <td className="py-3 px-3">
-                        <div className="space-y-0.5">
-                          <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 text-gray-300 text-[10px] font-mono inline-block max-w-[140px] truncate" title={user.lastMessage}>
-                            {user.lastMessage || 'None'}
-                          </span>
-                          <div className="text-[10px] text-gray-500 font-sans">{user.lastActive}</div>
-                        </div>
-                      </td>
-
-                      {/* 3. Access Status & Alerts Toggle */}
-                      <td className="py-3 px-3">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {user.isBanned ? (
-                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/30 whitespace-nowrap">
-                              <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                              <span>Banned</span>
-                            </span>
-                          ) : user.isAllowed ? (
-                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-mongo/10 text-mongo border border-mongo/30 whitespace-nowrap">
-                              <span className="w-1.5 h-1.5 rounded-full bg-mongo shrink-0" />
-                              <span>Authorized 🟢</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 whitespace-nowrap animate-pulse">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                              <span>Pending ⏳</span>
-                            </span>
-                          )}
-
-                          {user.isAllowed && (
+                        <div className="min-w-0">
+                          <div className="font-semibold text-white text-xs truncate flex items-center space-x-1">
+                            <span>{user.displayName}</span>
+                            {user.isAllowed && (
+                              <span title="Authorized user" className="text-mongo text-xs">✓</span>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-1 text-[10px] text-gray-400 font-mono">
+                            {user.username && <span className="text-blue-400 truncate max-w-[90px]">@{user.username}</span>}
+                            {user.username && <span>•</span>}
+                            <span className="text-gray-300">ID: {user.userId}</span>
                             <button
-                              onClick={() => handleToggleNotifications(user)}
-                              disabled={isProcessing}
-                              title="Toggle keep-alive notifications"
-                              className={`px-2 py-0.5 rounded text-[10px] font-semibold flex items-center space-x-1 transition whitespace-nowrap ${
-                                user.receiveNotifications
-                                  ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                                  : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border border-gray-700'
-                              }`}
+                              onClick={() => handleCopy(user.userId)}
+                              title="Copy User ID"
+                              className="text-gray-500 hover:text-mongo transition p-0.5"
                             >
-                              {user.receiveNotifications ? (
-                                <Bell className="w-2.5 h-2.5 text-blue-400 shrink-0" />
+                              {copiedId === user.userId ? (
+                                <Check className="w-2.5 h-2.5 text-mongo" />
                               ) : (
-                                <BellOff className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                                <Copy className="w-2.5 h-2.5" />
                               )}
-                              <span>{user.receiveNotifications ? 'Alerts ON' : 'Muted'}</span>
                             </button>
-                          )}
+                          </div>
                         </div>
-                      </td>
+                      </div>
 
-                      {/* 4. Actions (Allow/Revoke, Target, Ban) */}
-                      <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end space-x-1.5">
-                          {!user.isAllowed ? (
-                            <button
-                              onClick={() => handleToggleAllowUser(user, true)}
-                              disabled={isProcessing}
-                              className="px-2.5 py-1 bg-mongo hover:bg-mongo-400 text-black font-bold rounded-lg text-xs transition shadow-[0_0_10px_rgba(0,237,100,0.3)] flex items-center space-x-1 disabled:opacity-50"
-                            >
-                              <Unlock className="w-3 h-3 shrink-0" />
-                              <span>{isProcessing ? 'Allowing...' : 'Allow'}</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleToggleAllowUser(user, false)}
-                              disabled={isProcessing}
-                              className="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[11px] font-semibold transition flex items-center space-x-1 disabled:opacity-50"
-                            >
-                              <Lock className="w-3 h-3 shrink-0" />
-                              <span>Revoke</span>
-                            </button>
-                          )}
+                      {/* Status Badge */}
+                      <div className="shrink-0">
+                        {user.isBanned ? (
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/30 whitespace-nowrap">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                            <span>Banned</span>
+                          </span>
+                        ) : user.isAllowed ? (
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-mongo/10 text-mongo border border-mongo/30 whitespace-nowrap">
+                            <span className="w-1.5 h-1.5 rounded-full bg-mongo shrink-0" />
+                            <span>Authorized 🟢</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 whitespace-nowrap animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                            <span>Pending ⏳</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                          <button
-                            onClick={() => {
-                              setChatId(user.chatId || user.userId);
-                              showFeedback(`Target Chat ID set to ${user.displayName} (${user.userId})`);
-                            }}
-                            title="Set as notification target recipient"
-                            className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-[11px] transition flex items-center space-x-1"
-                          >
-                            <Zap className="w-3 h-3 text-mongo shrink-0" />
-                            <span>Target</span>
-                          </button>
-
-                          {user.isBanned ? (
-                            <button
-                              onClick={() => handleUnbanUser(user.userId)}
-                              className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-lg text-[11px] transition"
-                            >
-                              Unban
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handlePreFillBan(user)}
-                              className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-[11px] transition"
-                            >
-                              Ban
-                            </button>
-                          )}
+                    {/* Middle: Recent Message & Notification Toggle */}
+                    <div className="p-2.5 rounded-lg bg-[#0B1120] border border-gray-800/80 flex items-center justify-between gap-2 text-xs">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[10px] text-gray-500 font-mono">Recent Activity:</div>
+                        <div className="text-[11px] text-gray-200 font-mono truncate" title={user.lastMessage}>
+                          {user.lastMessage || 'None'}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        <div className="text-[10px] text-gray-500 font-sans mt-0.5">{user.lastActive}</div>
+                      </div>
+
+                      {user.isAllowed && (
+                        <button
+                          onClick={() => handleToggleNotifications(user)}
+                          disabled={isProcessing}
+                          title="Toggle keep-alive notifications"
+                          className={`px-2 py-1 rounded-lg text-[10px] font-semibold flex items-center space-x-1 transition shrink-0 ${
+                            user.receiveNotifications
+                              ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                              : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border border-gray-700'
+                          }`}
+                        >
+                          {user.receiveNotifications ? (
+                            <Bell className="w-2.5 h-2.5 text-blue-400 shrink-0" />
+                          ) : (
+                            <BellOff className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                          )}
+                          <span>{user.receiveNotifications ? 'Alerts ON' : 'Muted'}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Bottom Action Buttons Row */}
+                    <div className="grid grid-cols-3 gap-2 pt-1">
+                      {!user.isAllowed ? (
+                        <button
+                          onClick={() => handleToggleAllowUser(user, true)}
+                          disabled={isProcessing}
+                          className="w-full py-1.5 bg-mongo hover:bg-mongo-400 text-black font-bold rounded-lg text-xs transition flex items-center justify-center space-x-1 disabled:opacity-50"
+                        >
+                          <Unlock className="w-3 h-3 shrink-0" />
+                          <span>{isProcessing ? 'Allowing...' : 'Allow'}</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleAllowUser(user, false)}
+                          disabled={isProcessing}
+                          className="w-full py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-semibold transition flex items-center justify-center space-x-1 disabled:opacity-50"
+                        >
+                          <Lock className="w-3 h-3 shrink-0" />
+                          <span>Revoke</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setChatId(user.chatId || user.userId);
+                          showFeedback(`Target Chat ID set to ${user.displayName} (${user.userId})`);
+                        }}
+                        title="Set as notification target recipient"
+                        className="w-full py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-xs transition flex items-center justify-center space-x-1"
+                      >
+                        <Zap className="w-3 h-3 text-mongo shrink-0" />
+                        <span>Target</span>
+                      </button>
+
+                      {user.isBanned ? (
+                        <button
+                          onClick={() => handleUnbanUser(user.userId)}
+                          className="w-full py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-lg text-xs transition flex items-center justify-center"
+                        >
+                          Unban
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handlePreFillBan(user)}
+                          className="w-full py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs transition flex items-center justify-center"
+                        >
+                          Ban
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop View (>= sm): Responsive Data Table */}
+            <div className="hidden sm:block rounded-xl border border-gray-800 overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[580px]">
+                <thead className="bg-[#0B1120] text-gray-400 font-mono text-[10px] uppercase border-b border-gray-800">
+                  <tr>
+                    <th className="py-2.5 px-3">Telegram User</th>
+                    <th className="py-2.5 px-3">Recent Activity</th>
+                    <th className="py-2.5 px-3">Access &amp; Alerts</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800/60 font-mono text-[11px]">
+                  {detectedUsers.map((user) => {
+                    const isProcessing = processingUserId === user.userId;
+
+                    return (
+                      <tr key={user.id} className="hover:bg-gray-800/30 transition">
+                        {/* 1. User & Identity */}
+                        <td className="py-3 px-3 font-sans">
+                          <div className="flex items-center space-x-2.5">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-mongo/20 to-blue-500/20 border border-mongo/30 flex items-center justify-center text-mongo font-bold text-xs shrink-0">
+                              {(user.displayName || user.username || 'U')[0].toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-white truncate max-w-[140px] flex items-center space-x-1">
+                                <span>{user.displayName}</span>
+                                {user.isAllowed && (
+                                  <span title="Authorized user" className="text-mongo text-xs">✓</span>
+                                )}
+                              </div>
+                              <div className="flex items-center space-x-1 text-[10px] text-gray-400 font-mono">
+                                {user.username && <span className="text-blue-400 truncate max-w-[90px]">@{user.username}</span>}
+                                {user.username && <span>•</span>}
+                                <span className="text-gray-300">ID: {user.userId}</span>
+                                <button
+                                  onClick={() => handleCopy(user.userId)}
+                                  title="Copy User ID"
+                                  className="text-gray-500 hover:text-mongo transition p-0.5"
+                                >
+                                  {copiedId === user.userId ? (
+                                    <Check className="w-2.5 h-2.5 text-mongo" />
+                                  ) : (
+                                    <Copy className="w-2.5 h-2.5" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 2. Recent Message & Time */}
+                        <td className="py-3 px-3">
+                          <div className="space-y-0.5">
+                            <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 text-gray-300 text-[10px] font-mono inline-block max-w-[140px] truncate" title={user.lastMessage}>
+                              {user.lastMessage || 'None'}
+                            </span>
+                            <div className="text-[10px] text-gray-500 font-sans">{user.lastActive}</div>
+                          </div>
+                        </td>
+
+                        {/* 3. Access Status & Alerts Toggle */}
+                        <td className="py-3 px-3">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {user.isBanned ? (
+                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/30 whitespace-nowrap">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                                <span>Banned</span>
+                              </span>
+                            ) : user.isAllowed ? (
+                              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-mongo/10 text-mongo border border-mongo/30 whitespace-nowrap">
+                                <span className="w-1.5 h-1.5 rounded-full bg-mongo shrink-0" />
+                                <span>Authorized 🟢</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 whitespace-nowrap animate-pulse">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                                <span>Pending ⏳</span>
+                              </span>
+                            )}
+
+                            {user.isAllowed && (
+                              <button
+                                onClick={() => handleToggleNotifications(user)}
+                                disabled={isProcessing}
+                                title="Toggle keep-alive notifications"
+                                className={`px-2 py-0.5 rounded text-[10px] font-semibold flex items-center space-x-1 transition whitespace-nowrap ${
+                                  user.receiveNotifications
+                                    ? 'bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                    : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border border-gray-700'
+                                }`}
+                              >
+                                {user.receiveNotifications ? (
+                                  <Bell className="w-2.5 h-2.5 text-blue-400 shrink-0" />
+                                ) : (
+                                  <BellOff className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                                )}
+                                <span>{user.receiveNotifications ? 'Alerts ON' : 'Muted'}</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 4. Actions (Allow/Revoke, Target, Ban) */}
+                        <td className="py-3 px-3 text-right">
+                          <div className="flex items-center justify-end space-x-1.5">
+                            {!user.isAllowed ? (
+                              <button
+                                onClick={() => handleToggleAllowUser(user, true)}
+                                disabled={isProcessing}
+                                className="px-2.5 py-1 bg-mongo hover:bg-mongo-400 text-black font-bold rounded-lg text-xs transition shadow-[0_0_10px_rgba(0,237,100,0.3)] flex items-center space-x-1 disabled:opacity-50"
+                              >
+                                <Unlock className="w-3 h-3 shrink-0" />
+                                <span>{isProcessing ? 'Allowing...' : 'Allow'}</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleToggleAllowUser(user, false)}
+                                disabled={isProcessing}
+                                className="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[11px] font-semibold transition flex items-center space-x-1 disabled:opacity-50"
+                              >
+                                <Lock className="w-3 h-3 shrink-0" />
+                                <span>Revoke</span>
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => {
+                                setChatId(user.chatId || user.userId);
+                                showFeedback(`Target Chat ID set to ${user.displayName} (${user.userId})`);
+                              }}
+                              title="Set as notification target recipient"
+                              className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-[11px] transition flex items-center space-x-1"
+                            >
+                              <Zap className="w-3 h-3 text-mongo shrink-0" />
+                              <span>Target</span>
+                            </button>
+
+                            {user.isBanned ? (
+                              <button
+                                onClick={() => handleUnbanUser(user.userId)}
+                                className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-lg text-[11px] transition"
+                              >
+                                Unban
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handlePreFillBan(user)}
+                                className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-[11px] transition"
+                              >
+                                Ban
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* LIVE INCOMING TELEGRAM CHAT MESSAGES DETECTED FEED */}
-      <div className="glass-panel rounded-2xl p-6 bg-cardBg/90 border border-gray-800/80 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400">
+      <div className="glass-panel rounded-2xl p-4 sm:p-6 bg-cardBg/90 border border-gray-800/80 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 shrink-0">
               <MessageSquare className="w-4 h-4" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center space-x-2">
-                <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
+                <h3 className="text-sm font-semibold text-white uppercase tracking-wider truncate">
                   Live Detected Chat Messages
                 </h3>
-                <span className="w-2 h-2 rounded-full bg-mongo animate-ping" />
+                <span className="w-2 h-2 rounded-full bg-mongo animate-ping shrink-0" />
               </div>
               <p className="text-xs text-gray-400">
                 Incoming commands, greetings, and queries received from Telegram in real time.
@@ -562,8 +709,8 @@ export default function TelegramBot() {
             </div>
           </div>
 
-          <div className="text-[11px] font-mono text-gray-500 flex items-center space-x-1">
-            <Clock className="w-3 h-3" />
+          <div className="text-[11px] font-mono text-gray-400 flex items-center space-x-1.5 shrink-0 self-start sm:self-auto bg-gray-900/80 px-2.5 py-1 rounded-lg border border-gray-800 whitespace-nowrap">
+            <Clock className="w-3 h-3 text-mongo" />
             <span>Auto-refreshing (3s)</span>
           </div>
         </div>
@@ -575,13 +722,13 @@ export default function TelegramBot() {
             </div>
           ) : (
             recentMessages.map((msg) => (
-              <div key={msg.id} className="p-3 bg-[#0B1120]/60 hover:bg-gray-800/30 transition flex items-start justify-between gap-4">
-                <div className="flex items-start space-x-3">
+              <div key={msg.id} className="p-3 bg-[#0B1120]/60 hover:bg-gray-800/30 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-start space-x-2.5 min-w-0">
                   <div className="w-7 h-7 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs shrink-0 mt-0.5">
                     {(msg.displayName || msg.username || 'U')[0].toUpperCase()}
                   </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="font-semibold text-white text-xs">{msg.displayName}</span>
                       {msg.username && (
                         <span className="text-[10px] text-blue-400 font-mono">@{msg.username}</span>
@@ -592,13 +739,13 @@ export default function TelegramBot() {
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-gray-200 mt-1 font-mono bg-gray-900/80 px-2.5 py-1 rounded-lg border border-gray-800 inline-block">
+                    <div className="text-xs text-gray-200 mt-1 font-mono bg-gray-900/80 px-2.5 py-1 rounded-lg border border-gray-800 inline-block break-words max-w-full">
                       {msg.text}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2 shrink-0">
+                <div className="flex items-center justify-between sm:justify-end space-x-2 shrink-0 pt-1 sm:pt-0 border-t border-gray-800/40 sm:border-0 pl-9 sm:pl-0">
                   <span className="text-[10px] text-gray-500 font-mono">{msg.time}</span>
                   <button
                     onClick={() => {
@@ -607,7 +754,7 @@ export default function TelegramBot() {
                       showFeedback(`Reply target set to ${msg.displayName}`);
                     }}
                     title="Reply to this message"
-                    className="p-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition text-[10px] flex items-center space-x-1"
+                    className="px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition text-[10px] flex items-center space-x-1"
                   >
                     <Send className="w-3 h-3 text-mongo" />
                     <span>Reply</span>
@@ -623,7 +770,7 @@ export default function TelegramBot() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Column 1: Notification Dispatcher & Preferences */}
-        <div className="glass-panel rounded-2xl p-6 bg-cardBg/90 border border-gray-800/80 flex flex-col justify-between space-y-6">
+        <div className="glass-panel rounded-2xl p-4 sm:p-6 bg-cardBg/90 border border-gray-800/80 flex flex-col justify-between space-y-6">
           <form onSubmit={handleSendMessage} className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
@@ -654,7 +801,7 @@ export default function TelegramBot() {
               {/* Detected Users Quick Chips */}
               {detectedUsers.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                  <span className="text-[10px] text-gray-500 font-medium">Quick Pick:</span>
+                  <span className="text-[10px] text-gray-500 font-medium shrink-0">Quick Pick:</span>
                   {detectedUsers.map((u) => (
                     <button
                       key={u.id}
@@ -663,21 +810,21 @@ export default function TelegramBot() {
                         setChatId(u.chatId || u.userId);
                         showFeedback(`Target set to ${u.displayName} (${u.userId})`);
                       }}
-                      className={`px-2 py-0.5 rounded text-[10px] font-mono flex items-center space-x-1 border transition ${
+                      className={`px-2 py-1 rounded-lg text-[10px] font-mono flex items-center space-x-1 border transition max-w-full truncate ${
                         chatId === (u.chatId || u.userId)
                           ? 'bg-mongo/20 border-mongo/50 text-mongo font-bold'
                           : 'bg-gray-900 hover:bg-gray-800 border-gray-800 text-gray-400'
                       }`}
                     >
-                      <span>👤 {u.displayName}</span>
-                      <span className="text-gray-500">({u.userId})</span>
+                      <span className="truncate">👤 {u.displayName}</span>
+                      <span className="text-gray-500 shrink-0">({u.userId})</span>
                     </button>
                   ))}
                 </div>
               )}
 
-              <p className="text-[10px] text-gray-500 mt-1 flex items-center space-x-1">
-                <HelpCircle className="w-3 h-3 text-gray-500" />
+              <p className="text-[10px] text-gray-500 mt-1.5 flex items-start space-x-1">
+                <HelpCircle className="w-3.5 h-3.5 text-gray-500 shrink-0 mt-0.5" />
                 <span>Message <code>@{botInfo?.username || 'bot'}</code> and type <code>/id</code> to find your Chat ID.</span>
               </p>
             </div>
@@ -743,29 +890,29 @@ export default function TelegramBot() {
             </h4>
 
             <div className="space-y-2">
-              <label className="flex items-center justify-between p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 text-xs cursor-pointer">
-                <div>
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 text-xs cursor-pointer gap-3">
+                <div className="min-w-0">
                   <div className="text-gray-200 font-medium">Alert on Ping Failures</div>
-                  <div className="text-[11px] text-gray-500">Sends emergency alert to authorized subscribers if MongoDB ping fails.</div>
+                  <div className="text-[11px] text-gray-500 leading-tight">Sends emergency alert to authorized subscribers if MongoDB ping fails.</div>
                 </div>
                 <input
                   type="checkbox"
                   checked={notifyOnFailure}
                   onChange={(e) => setNotifyOnFailure(e.target.checked)}
-                  className="w-4 h-4 rounded text-mongo accent-mongo focus:ring-0"
+                  className="w-4 h-4 rounded text-mongo accent-mongo focus:ring-0 shrink-0"
                 />
               </label>
 
-              <label className="flex items-center justify-between p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 text-xs cursor-pointer">
-                <div>
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 text-xs cursor-pointer gap-3">
+                <div className="min-w-0">
                   <div className="text-gray-200 font-medium">Alert on Every Ping Cycle (Auto-Ping)</div>
-                  <div className="text-[11px] text-gray-500">Sends success report to all authorized subscribers when database ping succeeds.</div>
+                  <div className="text-[11px] text-gray-500 leading-tight">Sends success report to all authorized subscribers when database ping succeeds.</div>
                 </div>
                 <input
                   type="checkbox"
                   checked={notifyOnPing}
                   onChange={(e) => setNotifyOnPing(e.target.checked)}
-                  className="w-4 h-4 rounded text-mongo accent-mongo focus:ring-0"
+                  className="w-4 h-4 rounded text-mongo accent-mongo focus:ring-0 shrink-0"
                 />
               </label>
             </div>
@@ -783,7 +930,7 @@ export default function TelegramBot() {
         </div>
 
         {/* Column 2: Telegram User Ban Management */}
-        <div id="ban-user-section" className="glass-panel rounded-2xl p-6 bg-cardBg/90 border border-gray-800/80 flex flex-col justify-between space-y-6">
+        <div id="ban-user-section" className="glass-panel rounded-2xl p-4 sm:p-6 bg-cardBg/90 border border-gray-800/80 flex flex-col justify-between space-y-6">
           <div>
             <div className="flex items-center space-x-2 mb-4">
               <ShieldAlert className="w-4 h-4 text-red-400" />
@@ -796,7 +943,7 @@ export default function TelegramBot() {
             </p>
 
             {/* Ban New User Form */}
-            <form onSubmit={handleBanUser} className="p-4 rounded-xl bg-gray-900/80 border border-gray-800 space-y-3 mb-6">
+            <form onSubmit={handleBanUser} className="p-3.5 sm:p-4 rounded-xl bg-gray-900/80 border border-gray-800 space-y-3 mb-6">
               <div className="text-xs font-semibold text-red-400 uppercase tracking-wider flex items-center space-x-1.5">
                 <UserX className="w-3.5 h-3.5" />
                 <span>Ban Telegram User</span>
@@ -855,8 +1002,8 @@ export default function TelegramBot() {
                 </h4>
               </div>
 
-              <div className="rounded-xl border border-gray-800 overflow-hidden max-h-56 overflow-y-auto">
-                <table className="w-full text-left text-xs">
+              <div className="rounded-xl border border-gray-800 overflow-x-auto max-h-56 overflow-y-auto">
+                <table className="w-full text-left text-xs min-w-[360px]">
                   <thead className="bg-[#0B1120] text-gray-400 font-mono text-[10px] uppercase border-b border-gray-800">
                     <tr>
                       <th className="py-2.5 px-3">User ID</th>
@@ -901,7 +1048,7 @@ export default function TelegramBot() {
           </div>
 
           {/* Webhook Configuration Note */}
-          <div className="pt-3 border-t border-gray-800/80 text-[11px] text-gray-500 leading-relaxed font-mono">
+          <div className="pt-3 border-t border-gray-800/80 text-[11px] text-gray-500 leading-relaxed font-mono break-all">
             <span>Webhook URL: </span>
             <code className="text-mongo text-[10px]">/.netlify/functions/telegram?action=webhook</code>
           </div>

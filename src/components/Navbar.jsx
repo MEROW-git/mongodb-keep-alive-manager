@@ -12,32 +12,32 @@ export default function Navbar({ onPingTriggered, isPinging, dbStatus = 'ONLINE'
 
   return (
     <header className="sticky top-0 z-40 w-full glass-panel border-b border-gray-800/80 bg-[#0B1120]/90 backdrop-blur-xl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
         
         {/* Left: Brand & Status */}
-        <div className="flex items-center space-x-3 sm:space-x-4">
+        <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
           <button
             onClick={onToggleMobileMenu}
-            className="md:hidden p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800/60 transition"
+            className="md:hidden p-1.5 sm:p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800/60 transition shrink-0"
             aria-label="Toggle menu"
           >
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-mongo/10 border border-mongo/30 flex items-center justify-center text-mongo shadow-[0_0_15px_rgba(0,237,100,0.15)]">
-              <Database className="w-5 h-5 text-mongo" />
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-mongo/10 border border-mongo/30 flex items-center justify-center text-mongo shadow-[0_0_15px_rgba(0,237,100,0.15)] shrink-0">
+              <Database className="w-4 h-4 sm:w-5 sm:h-5 text-mongo" />
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-white text-sm sm:text-base tracking-tight">
+            <div className="min-w-0">
+              <div className="flex items-center space-x-1.5 sm:space-x-2">
+                <span className="font-bold text-white text-xs sm:text-base tracking-tight truncate">
                   MongoDB Keep Alive
                 </span>
-                <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-mongo/20 text-mongo border border-mongo/40">
+                <span className="hidden sm:inline-block text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-mongo/20 text-mongo border border-mongo/40 shrink-0">
                   Manager
                 </span>
               </div>
-              <p className="text-xs text-gray-400 hidden sm:block">
+              <p className="text-xs text-gray-400 hidden lg:block">
                 Serverless Atlas Keep-Alive & Monitoring
               </p>
             </div>
@@ -45,7 +45,7 @@ export default function Navbar({ onPingTriggered, isPinging, dbStatus = 'ONLINE'
         </div>
 
         {/* Right: Actions & User */}
-        <div className="flex items-center space-x-2 sm:space-x-4">
+        <div className="flex items-center space-x-1.5 sm:space-x-4 shrink-0">
           
           {/* Status Indicator */}
           <div className="hidden sm:flex items-center space-x-2 px-3 py-1 rounded-full bg-gray-900/80 border border-gray-800 text-xs">
@@ -64,7 +64,7 @@ export default function Navbar({ onPingTriggered, isPinging, dbStatus = 'ONLINE'
             id="navbar-ping-btn"
             onClick={onPingTriggered}
             disabled={isPinging}
-            className="flex items-center space-x-1.5 sm:space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium rounded-lg bg-mongo text-black hover:bg-mongo-400 active:scale-95 transition-all shadow-[0_0_20px_rgba(0,237,100,0.25)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center space-x-1.5 sm:space-x-2 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium rounded-lg bg-mongo text-black hover:bg-mongo-400 active:scale-95 transition-all shadow-[0_0_20px_rgba(0,237,100,0.25)] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
           >
             <Zap className={`w-3.5 h-3.5 sm:w-4 sm:h-4 fill-black ${isPinging ? 'animate-spin' : ''}`} />
             <span>{isPinging ? 'Pinging...' : 'Ping Now'}</span>

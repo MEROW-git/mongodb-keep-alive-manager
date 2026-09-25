@@ -213,7 +213,7 @@ export default function App() {
         />
 
         {/* Page Content Viewport */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 w-full min-w-0">
           {currentTab === 'dashboard' && (
             <Dashboard
               dashboardData={dashboardData}

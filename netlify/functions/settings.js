@@ -1,13 +1,15 @@
-const { connectToDatabase } = require('./lib/mongodb');
+﻿const { connectToDatabase } = require('./lib/mongodb');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 
 function maskMongoUri(uri) {
   if (!uri) return 'Not configured';
   try {
-    // Mask password inside mongodb+srv://username:password@cluster...
-    return uri.replace(/(mongodb(?:\+srv)?:\/\/[^:]+:)([^@]+)(@.+)/, '$1••••••••$3');
+    // Extract hostname only, masking all credentials completely
+    const parsed = new URL(uri.replace(/^mongodb\+srv:\/\//, 'http://'));
+    const host = parsed.hostname || 'cluster.mongodb.net';
+    return `mongodb+srv://••••••••:••••••••@${host}`;
   } catch (e) {
-    return 'mongodb+srv://••••••••@cluster';
+    return 'mongodb+srv://••••••••:••••••••@cluster.mongodb.net';
   }
 }
 
@@ -50,7 +52,7 @@ exports.handler = async (event, context) => {
       return jsonResponse(200, {
         status: 'success',
         settings: {
-          enabled: !!settings.enabled,
+          enabled: Boolean(settings.enabled),
           interval: settings.interval || 5,
           updatedAt: settings.updatedAt || new Date().toISOString(),
         },
@@ -76,7 +78,7 @@ exports.handler = async (event, context) => {
       if (typeof body.enabled === 'boolean') {
         updates.enabled = body.enabled;
       }
-      if (typeof body.interval === 'number' || !isNaN(parseInt(body.interval, 10))) {
+      if (typeof body.interval === 'number' || (typeof body.interval === 'string' && !isNaN(parseInt(body.interval, 10)))) {
         const intervalNum = Math.max(1, Math.min(1440, parseInt(body.interval, 10)));
         updates.interval = intervalNum;
       }
@@ -94,7 +96,7 @@ exports.handler = async (event, context) => {
         status: 'success',
         message: 'Settings updated successfully',
         settings: {
-          enabled: !!updatedSettings.enabled,
+          enabled: Boolean(updatedSettings.enabled),
           interval: updatedSettings.interval,
           updatedAt: updatedSettings.updatedAt,
         },
@@ -103,11 +105,10 @@ exports.handler = async (event, context) => {
 
     return jsonResponse(405, { status: 'error', message: 'Method Not Allowed' });
   } catch (error) {
-    console.error('Settings function error:', error);
+    console.error('Settings function error:', error.message);
     return jsonResponse(500, {
       status: 'error',
       message: 'Failed to manage settings',
-      details: error.message,
     });
   }
 };

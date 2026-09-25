@@ -14,11 +14,10 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Security check: Allow execution if:
+  // Security check: Allow execution only if:
   // 1. Invoked by Netlify scheduled event or background runner
-  // 2. Valid JWT user token provided
-  // 3. Valid CRON_SECRET provided in query param (?key=...) or header (x-cron-secret)
-  // 4. If CRON_SECRET is not configured or in dev, allow GET/POST ping
+  // 2. Valid JWT user token provided (logged-in admin)
+  // 3. Valid CRON_SECRET provided via query param (?key=...) or header (x-cron-secret)
   const authHeader = event.headers.authorization || event.headers.Authorization;
   const decoded = verifyToken(authHeader);
 
@@ -28,14 +27,14 @@ exports.handler = async (event, context) => {
     event.headers['x-cron-secret'] ||
     event.headers['X-Cron-Secret'];
 
-  const isNetlifyScheduled = event.type === 'schedule' || context?.clientContext?.custom?.scheduled;
-  const isAuthorizedCron = cronSecret ? providedSecret === cronSecret : true;
-  const isAuthorizedUser = !!decoded;
+  const isNetlifyScheduled = event.type === 'schedule' || Boolean(context?.clientContext?.custom?.scheduled);
+  const isAuthorizedCron = Boolean(cronSecret && providedSecret && providedSecret === cronSecret);
+  const isAuthorizedUser = Boolean(decoded);
 
   if (!isNetlifyScheduled && !isAuthorizedUser && !isAuthorizedCron) {
     return jsonResponse(401, {
       status: 'error',
-      message: 'Unauthorized: Valid JWT token or cron secret required to trigger ping',
+      message: 'Unauthorized: Valid JWT token or cron secret required to trigger keep-alive ping',
     });
   }
 
@@ -71,7 +70,7 @@ exports.handler = async (event, context) => {
       });
     } catch (mongoErr) {
       const mongoLatency = Date.now() - mongoStart;
-      console.error('MongoDB Ping operation failed:', mongoErr);
+      console.error('MongoDB Ping operation failed:', mongoErr.message);
 
       await logsCol.insertOne({
         action: 'PING',
@@ -89,7 +88,7 @@ exports.handler = async (event, context) => {
         status: 'FAILED',
         database: mongoDbName,
         responseTime: mongoLatency,
-        error: mongoErr.message,
+        error: 'Ping operation failed',
       });
     }
 
@@ -116,7 +115,7 @@ exports.handler = async (event, context) => {
         });
       } catch (pgErr) {
         const pgLatency = Date.now() - pgStart;
-        console.error('PostgreSQL Ping operation failed:', pgErr);
+        console.error('PostgreSQL Ping operation failed:', pgErr.message);
 
         await logsCol.insertOne({
           action: 'PING',
@@ -134,7 +133,7 @@ exports.handler = async (event, context) => {
           status: 'FAILED',
           database: process.env.postgresql_db || 'postgresql',
           responseTime: pgLatency,
-          error: pgErr.message,
+          error: 'PostgreSQL ping error',
         });
       }
     }
@@ -162,7 +161,7 @@ exports.handler = async (event, context) => {
         });
       } catch (mysqlErr) {
         const mysqlLatency = Date.now() - mysqlStart;
-        console.error('MySQL Ping operation failed:', mysqlErr);
+        console.error('MySQL Ping operation failed:', mysqlErr.message);
 
         await logsCol.insertOne({
           action: 'PING',
@@ -180,7 +179,7 @@ exports.handler = async (event, context) => {
           status: 'FAILED',
           database: process.env.mysql_db || process.env.MYSQL_DB || 'mysql',
           responseTime: mysqlLatency,
-          error: mysqlErr.message,
+          error: 'MySQL ping error',
         });
       }
     }
@@ -208,11 +207,10 @@ exports.handler = async (event, context) => {
       fullTimestamp: nowIso,
     });
   } catch (error) {
-    console.error('Overall ping handler failed:', error);
+    console.error('Overall ping handler failed:', error.message);
     return jsonResponse(500, {
       status: 'error',
-      database: mongoDbName,
-      error: error.message,
+      message: 'Keep-alive ping execution failed',
       timestamp: new Date().toISOString(),
     });
   }

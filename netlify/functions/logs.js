@@ -1,4 +1,4 @@
-const { connectToDatabase } = require('./lib/mongodb');
+﻿const { connectToDatabase } = require('./lib/mongodb');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 
 exports.handler = async (event, context) => {
@@ -39,10 +39,10 @@ exports.handler = async (event, context) => {
       const params = event.queryStringParameters || {};
       const page = Math.max(1, parseInt(params.page, 10) || 1);
       const limit = Math.min(100, Math.max(1, parseInt(params.limit, 10) || 20));
-      const statusFilter = params.status; // 'SUCCESS' | 'FAILED' | undefined
+      const statusFilter = typeof params.status === 'string' ? params.status.trim() : '';
 
       const query = {};
-      if (statusFilter && (statusFilter === 'SUCCESS' || statusFilter === 'FAILED')) {
+      if (statusFilter === 'SUCCESS' || statusFilter === 'FAILED') {
         query.status = statusFilter;
       }
 
@@ -58,11 +58,12 @@ exports.handler = async (event, context) => {
 
       const formattedLogs = rawLogs.map((log) => ({
         id: log._id.toString(),
+        target: log.target || 'MongoDB',
         action: log.action || 'PING',
         status: log.status,
         responseTime: log.responseTime !== undefined ? `${log.responseTime} ms` : '-',
         rawResponseTime: log.responseTime || 0,
-        error: log.error || null,
+        error: log.error ? 'Operation encountered an error' : null,
         timestamp: new Date(log.createdAt).toISOString(),
         formattedTime: new Date(log.createdAt).toLocaleString('en-US', {
           dateStyle: 'medium',
@@ -85,11 +86,10 @@ exports.handler = async (event, context) => {
 
     return jsonResponse(405, { status: 'error', message: 'Method Not Allowed' });
   } catch (error) {
-    console.error('Logs function error:', error);
+    console.error('Logs function error:', error.message);
     return jsonResponse(500, {
       status: 'error',
       message: 'Failed to retrieve logs',
-      details: error.message,
     });
   }
 };

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Database, Lock, User, ArrowRight, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react';
 import api from '../services/api';
 
 export default function Login({ onLoginSuccess }) {
-  const [username, setUsername] = useState('YELLOWMEOW');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,6 +79,7 @@ export default function Login({ onLoginSuccess }) {
                   id="username-input"
                   type="text"
                   required
+                  autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter admin username"
@@ -100,6 +101,7 @@ export default function Login({ onLoginSuccess }) {
                   id="password-input"
                   type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
@@ -130,7 +132,7 @@ export default function Login({ onLoginSuccess }) {
           {/* Quick Credential Helper Pill */}
           <div className="mt-6 pt-5 border-t border-gray-800/80 text-center">
             <p className="text-[11px] text-gray-500">
-              Configured via environment variables <code className="text-gray-400 font-mono">.env</code>
+              Secured with bcrypt & JSON Web Tokens
             </p>
           </div>
         </div>
@@ -138,7 +140,7 @@ export default function Login({ onLoginSuccess }) {
         {/* Security badge footer */}
         <div className="flex items-center justify-center space-x-2 mt-6 text-xs text-gray-500">
           <ShieldCheck className="w-4 h-4 text-mongo" />
-          <span>Secured with bcrypt & JSON Web Tokens</span>
+          <span>Restricted Admin Portal</span>
         </div>
       </div>
     </div>

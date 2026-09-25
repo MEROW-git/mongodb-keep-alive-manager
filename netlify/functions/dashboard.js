@@ -168,7 +168,7 @@ exports.handler = async (event, context) => {
         fullTimestamp: date.toISOString(),
         status: log.status,
         responseTime: `${log.responseTime || 0} ms`,
-        message: log.error ? `${targetLabel} error: ${log.error}` : defaultMsg,
+        message: log.status === 'SUCCESS' ? defaultMsg : `${targetLabel} ping check failed`,
       };
     });
 
@@ -208,7 +208,7 @@ exports.handler = async (event, context) => {
         totalFailedPing: totalFailed,
       },
       automation: {
-        enabled: !!settings.enabled,
+        enabled: Boolean(settings.enabled),
         interval: settings.interval || 5,
         nextScheduledPing: nextScheduledPingFormatted,
       },
@@ -220,11 +220,10 @@ exports.handler = async (event, context) => {
       },
     });
   } catch (error) {
-    console.error('Dashboard statistics error:', error);
+    console.error('Dashboard statistics error:', error.message);
     return jsonResponse(500, {
       status: 'error',
       message: 'Failed to retrieve dashboard statistics',
-      details: error.message,
     });
   }
 };

@@ -6,7 +6,11 @@ const url = require('url');
 const os = require('os');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
-const PORT = parseInt(process.env.PORT, 10) || 5173;
+const HOST = (process.env.HOST && process.env.HOST.trim()) || '0.0.0.0';
+const parsedPort = parseInt(process.env.PORT, 10);
+const PORT = (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) ? parsedPort : 5173;
+const rawPublicUrl = process.env.PUBLIC_URL ? process.env.PUBLIC_URL.trim() : '';
+const PUBLIC_URL = rawPublicUrl ? rawPublicUrl.replace(/\/+$/, '') : null;
 const DIST_DIR = path.resolve(__dirname, 'dist');
 const MAX_PAYLOAD_BYTES = 100 * 1024; // 100 KB max payload size to prevent DoS memory exhaustion
 
@@ -87,6 +91,18 @@ async function handleRequest(req, res) {
   }
 
   const pathname = parsedUrl.pathname || '/';
+
+  // 0. Basic Health Check Endpoint
+  if (req.method === 'GET' && (pathname === '/health' || pathname === '/health/')) {
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({
+      status: 'ok',
+      uptime: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+    }));
+    return;
+  }
 
   // 1. API Route Handling
   let functionName = null;
@@ -253,15 +269,19 @@ function createServerInstance() {
 const { server, isHttps } = createServerInstance();
 const protocol = isHttps ? 'https' : 'http';
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, HOST, () => {
   const localIp = getLocalIp();
   console.log('\n============================================================');
   console.log(`🚀 Multi-DB Keep Alive Manager Server is Running (${protocol.toUpperCase()})!`);
   console.log('============================================================');
   console.log(`🌐 Local:        ${protocol}://localhost:${PORT}`);
   console.log(`📡 Wi-Fi / LAN:  ${protocol}://${localIp}:${PORT}`);
+  if (PUBLIC_URL) {
+    console.log(`🌍 Public URL:   ${PUBLIC_URL}`);
+  }
+  console.log(`🩺 Health Check: ${protocol}://localhost:${PORT}/health`);
   console.log(`⚙️  Databases:    MongoDB Atlas + PostgreSQL + MySQL`);
-  if (!isHttps) {
+  if (!isHttps && (!PUBLIC_URL || !PUBLIC_URL.startsWith('https://'))) {
     console.log('⚠️  SECURITY NOTE: Running unencrypted HTTP. On public or shared Wi-Fi,');
     console.log('   use HTTPS (set SSL_KEY_PATH & SSL_CERT_PATH) or a Caddy/Nginx reverse proxy.');
   }

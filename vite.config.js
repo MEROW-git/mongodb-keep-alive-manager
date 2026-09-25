@@ -60,6 +60,17 @@ function netlifyFunctionsDevPlugin() {
 
         const pathname = parsedUrl.pathname || '';
 
+        if (req.method === 'GET' && (pathname === '/health' || pathname === '/health/')) {
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            status: 'ok',
+            uptime: Math.floor(process.uptime()),
+            timestamp: new Date().toISOString(),
+          }));
+          return;
+        }
+
         let functionName = null;
         if (pathname.startsWith('/.netlify/functions/')) {
           functionName = pathname.replace('/.netlify/functions/', '').split('/')[0];

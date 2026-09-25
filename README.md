@@ -45,176 +45,220 @@
 
 ---
 
-## 🍓 Raspberry Pi / Local Wi-Fi Setup Guide
+## 🍓 Raspberry Pi Deployment Guide
 
-This guide walks you through hosting the bot on a Raspberry Pi connected to your home Wi-Fi router so you can manage your databases from any device on your local network.
+This project can be deployed on a Raspberry Pi (or any Linux/Debian/Ubuntu server) in two distinct modes depending on your requirements.
 
-### 1. Prerequisites on Raspberry Pi
-Ensure Node.js (v18 or v20+) and Git are installed on your Raspberry Pi:
+---
+
+### Deployment Modes Overview
+
+| Feature | Mode 1: LAN-Only Access | Mode 2: Public Domain with Caddy HTTPS |
+| :--- | :--- | :--- |
+| **URL** | `http://raspberrypi.local:5173` or `http://<LAN_IP>:5173` | `https://keepalive.yourdomain.com` |
+| **Network Reach** | Devices on same Wi-Fi router / home network | Any device globally over the Internet |
+| **Port Forwarding** | **None** (100% private to your LAN) | Port 80 & 443 forwarded to Pi |
+| **TLS / SSL** | Unencrypted HTTP or self-signed `server.crt` | **Automatic HTTPS** (Let's Encrypt / ZeroSSL via Caddy) |
+| **Telegram Bot** | **Polling Mode** (No public URL required!) | **Polling OR Webhook Mode** |
+| **Reverse Proxy** | None (Node.js binds directly) | Caddy reverse proxy to `127.0.0.1:5173` |
+
+---
+
+### 1. Prerequisites on Raspberry Pi OS
 ```bash
-# Update package repositories
+# 1. Update system packages
 sudo apt update && sudo apt upgrade -y
 
-# Install Node.js (v20 LTS) & Git
+# 2. Install Node.js (v20 LTS recommended) and Git
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs git
-```
-
-Verify installation:
-```bash
-node -v   # Should be v18+ or v20+
-npm -v
 ```
 
 ---
 
 ### 2. Clone and Install Dependencies
 ```bash
-git clone https://github.com/MEROW-git/mongodb-keep-alive-manager.git
-cd mongodb-keep-alive-manager
+git clone <your-repository-url> /home/pi/small_bot_keepdb_alive
+cd /home/pi/small_bot_keepdb_alive
+
 npm install
+npm run build
 ```
 
 ---
 
-### 3. Configure Environment Variables
-Copy `.env.example` to `.env`:
+### 3. Environment Configuration (`.env`)
+Copy the sample environment file:
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-Configure your credentials:
+Configure your server and database connection strings:
 ```env
+# Web Server Configuration
+HOST=0.0.0.0
+PORT=5173
+PUBLIC_URL=http://raspberrypi.local:5173
+
 # 🍃 MongoDB Atlas (Required)
-MONGO_URI=mongodb+srv://<user>:<password>@cluster0.zohxxqm.mongodb.net/?retryWrites=true&w=majority
+MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/?retryWrites=true&w=majority
 MONGO_DB_NAME=system_reset
 WEBADMIN_COLLECTION=sysreset
 
-# 🐘 PostgreSQL (Optional - leave blank if not used)
-postgresql_url=postgresql://<user>:<password>@<host>:<port>/<database>?sslmode=require
+# 🐘 PostgreSQL (Optional - e.g. Aiven, Supabase, Neon)
+postgresql_url=postgresql://avnadmin:<password>@<host>:<port>/defaultdb?sslmode=require
 postgresql_db=defaultdb
 
-# 🐬 MySQL (Optional - leave blank if not used)
-mysql_url=mysql://<user>:<password>@<host>:<port>/<database>
-mysql_db=mysql
+# 🐬 MySQL (Optional - e.g. Aiven, PlanetScale, TiDB)
+mysql_url=mysql://avnadmin:<password>@<host>:<port>/defaultdb
+mysql_db=defaultdb
 
-# 🔒 TLS / SSL Certificate Validation
+# 🔒 Strict SSL Verification with Root CA
 DB_SSL_REJECT_UNAUTHORIZED=true
-# Optional custom CA path for databases with private CA certs (e.g. Aiven ca.pem):
-# DB_SSL_CA_PATH=./ca.pem
+DB_SSL_CA_PATH=./ca.pem
 
-# 🔐 Security & Admin Login (Required: minimum 16 random characters)
-JWT_SECRET=generate_with_openssl_rand_hex_32
-ADMIN_USERNAME=your_admin_username
-ADMIN_PASSWORD=your_strong_admin_password_min_12_chars
+# 🔐 Security & Admin Login
+JWT_SECRET=generate_with_openssl_rand_hex_32_min_16_chars
+ADMIN_USERNAME=pi_admin
+ADMIN_PASSWORD=strong_password_here_12_chars
+CRON_SECRET=custom_random_cron_secret
 
-# ⚡ Secret Token for Cron Webhook Triggers (Sent via header: "x-cron-secret")
-CRON_SECRET=your_custom_cron_secret_trigger_token
-
-# 🤖 Telegram Bot Token (from @BotFather)
-telegram_bot=1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ
-
-# 🛡️ Telegram Webhook Secret Token (Sent by Telegram via header "X-Telegram-Bot-Api-Secret-Token")
-TELEGRAM_WEBHOOK_SECRET=your_telegram_webhook_secret_token_here
-```
-
-> **Security Tip**: Generate a strong JWT secret using OpenSSL:
-> ```bash
-> openssl rand -hex 32
-> ```
-
----
-
-### 4. Test Database Connections
-Verify all configured databases can connect and ping:
-```bash
-npm run test:db
-```
-You should see:
-```text
-🍃 Testing MongoDB Atlas Connection...  -> ✅ connected & pinged!
-🐘 Testing PostgreSQL Connection...     -> ✅ connected & pinged!
-🐬 Testing MySQL Connection...          -> ✅ connected & pinged!
+# 🤖 Telegram Bot (Leave webhook secret blank if using Polling)
+telegram_bot=your_telegram_bot_token_from_botfather
+TELEGRAM_WEBHOOK_SECRET=optional_only_for_public_webhook_mode
 ```
 
 ---
 
-### 5. Find Your Raspberry Pi's Local IP Address
-Run:
-```bash
-hostname -I
-```
-Look for your Wi-Fi IPv4 address (e.g. `192.168.1.45` or `192.168.0.100`).
+### 4. Mode 1: LAN-Only Deployment (Home Wi-Fi)
 
----
+In LAN-Only mode, the dashboard and API are accessible strictly to devices connected to your home Wi-Fi or router.
 
-### 6. Run the Application
-
-#### Option A: Production Mode (Recommended for 24/7 Raspberry Pi)
-Build the frontend once, then run the ultra-lightweight standalone server (~35MB RAM, low CPU):
-```bash
-npm run build
-npm start
-```
-The server will output:
-```text
-============================================================
-🚀 Multi-DB Keep Alive Manager Server is Running (HTTP)!
-============================================================
-🌐 Local:        http://localhost:5173
-📡 Wi-Fi / LAN:  http://192.168.1.45:5173
-⚙️  Databases:    MongoDB Atlas + PostgreSQL + MySQL
-============================================================
-```
-Now, open your phone or PC connected to the same Wi-Fi and browse to:
-**`http://192.168.1.45:5173`**
-
-#### Option B: Encrypted HTTPS on Local Wi-Fi (Recommended for Security)
-To protect login passwords and JWT sessions from local network packet sniffing on Wi-Fi, enable HTTPS:
-
-1. Generate a local SSL certificate using `mkcert` or `openssl`:
+1. **Start the server**:
    ```bash
-   openssl req -x509 -newkey rsa:2048 -nodes -sha256 -subj '/CN=raspberrypi.local' \
-     -keyout server.key -out server.crt -days 365
+   npm start
    ```
-2. Add paths to your `.env`:
-   ```env
-   SSL_KEY_PATH=./server.key
-   SSL_CERT_PATH=./server.crt
+   The server automatically detects your IP and displays:
+   ```text
+   ============================================================
+   🚀 Multi-DB Keep Alive Manager Server is Running (HTTP)!
+   ============================================================
+   🌐 Local:        http://localhost:5173
+   📡 Wi-Fi / LAN:  http://192.168.1.45:5173
+   🌍 Public URL:   http://raspberrypi.local:5173
+   🩺 Health Check: http://localhost:5173/health
+   ⚙️  Databases:    MongoDB Atlas + PostgreSQL + MySQL
+   ============================================================
    ```
-3. Run `npm start`. The server will automatically run with TLS encryption (`https://192.168.1.45:5173`).
 
-Alternatively, use **Caddy** as a reverse proxy for automatic HTTPS with a single command:
-```bash
-caddy reverse-proxy --from :443 --to :5173
-```
+2. **Access the Dashboard**:
+   - Via mDNS: `http://raspberrypi.local:5173`
+   - Via LAN IP: `http://192.168.1.45:5173` (replace with your Pi's LAN IP from `hostname -I`)
+
+3. **Telegram Bot in LAN Mode**:
+   - The server uses **Telegram Polling Mode** by default.
+   - Polling makes outbound HTTPS calls to `api.telegram.org` to fetch updates and send notifications.
+   - **No router port forwarding or public domain is needed!**
 
 ---
 
-### 7. Run 24/7 on Boot with PM2
-To keep the server and keep-alive pinger running in the background continuously:
+### 5. Mode 2: Public Domain with Automatic HTTPS via Caddy
+
+If you want to access your dashboard from outside your home or use Telegram Webhook mode, use **Caddy** as a lightweight reverse proxy. Caddy automatically provisions and renews SSL certificates from Let's Encrypt / ZeroSSL.
+
+1. **Install Caddy on Raspberry Pi**:
+   ```bash
+   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+   sudo apt update && sudo apt install -y caddy
+   ```
+
+2. **Configure Caddy** (`Caddyfile.example` is provided in the repository):
+   Edit `/etc/caddy/Caddyfile`:
+   ```caddy
+   keepalive.yourdomain.com {
+       encode gzip zstd
+
+       # Reverse proxy to the local Keep-Alive server
+       reverse_proxy 127.0.0.1:5173
+
+       # Hardened Security Headers
+       header {
+           Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+           X-Content-Type-Options "nosniff"
+           X-Frame-Options "DENY"
+           Referrer-Policy "strict-origin-when-cross-origin"
+       }
+
+       log {
+           output file /var/log/caddy/keepalive.log {
+               roll_size 10mb
+               roll_keep 5
+           }
+       }
+   }
+   ```
+
+3. **Update `.env` for Public Domain**:
+   ```env
+   HOST=127.0.0.1
+   PORT=5173
+   PUBLIC_URL=https://keepalive.yourdomain.com
+   ```
+
+4. **Reload Caddy**:
+   ```bash
+   sudo systemctl reload caddy
+   ```
+
+---
+
+### 6. Run 24/7 on Boot: Systemd Service (Recommended)
+
+A template is provided in [`keepalive.service.example`](keepalive.service.example). To configure systemd to start the application automatically on boot and auto-restart on any error:
 
 ```bash
-# Install PM2 process manager
-sudo npm install -g pm2
+# 1. Copy the unit file
+sudo cp keepalive.service.example /etc/systemd/system/keepalive.service
 
-# Start the server with PM2
-pm2 start server.cjs --name "keepdb-alive"
+# 2. If your Pi username is not "pi", adjust User= and WorkingDirectory=
+sudo nano /etc/systemd/system/keepalive.service
 
-# Save process list and enable system startup
-pm2 save
-pm2 startup
-# (Run the sudo command that PM2 displays on screen)
+# 3. Reload systemd and enable service
+sudo systemctl daemon-reload
+sudo systemctl enable --now keepalive
+
+# 4. Verify service status
+sudo systemctl status keepalive
 ```
 
-Useful PM2 commands:
+Useful Systemd Commands:
 ```bash
-pm2 status               # Check status
-pm2 logs keepdb-alive    # View live logs and ping times
-pm2 restart keepdb-alive # Restart server
-pm2 stop keepdb-alive    # Stop server
+sudo systemctl restart keepalive   # Restart service
+sudo systemctl stop keepalive      # Stop service
+journalctl -u keepalive -f         # View live keep-alive logs & ping times
 ```
+
+*(Alternatively, PM2 can still be used: `pm2 start server.cjs --name "keepdb-alive" && pm2 save && pm2 startup`)*
+
+---
+
+### 7. Health Check Endpoint
+A lightweight, non-blocking health check endpoint is available at:
+```http
+GET /health
+```
+**Sample Response (HTTP 200)**:
+```json
+{
+  "status": "ok",
+  "uptime": 3600,
+  "timestamp": "2026-09-25T18:25:02.992Z"
+}
+```
+This can be queried by local monitoring tools, uptime daemons, or router scripts without exposing sensitive database or authentication information.
 
 ---
 
@@ -233,17 +277,33 @@ The bot includes full Telegram integration for mobile notifications and controls
 3. Click **Allow Access** to approve them, or **Revoke Access** to block them.
 4. Admins can ban unauthorized or abusive users directly from the dashboard.
 
-### Setting Up Telegram Webhook (Authenticated)
-When setting your webhook URL with Telegram, always include `secret_token`:
+### Telegram Architecture: Polling vs. Webhook
+
+| Mode | How it Works | Network Requirement | When to Use |
+| :--- | :--- | :--- | :--- |
+| **Polling Mode** *(Default)* | The server contacts Telegram's API outbound every 3 seconds to fetch messages. | **No public IP / no domain required.** Works behind any home router or firewall. | **LAN-Only Hosting** (Raspberry Pi at home) |
+| **Webhook Mode** | Telegram pushes incoming updates to your public HTTPS URL. | **Requires a public HTTPS domain** (e.g. `https://keepalive.yourdomain.com/api/telegram?action=webhook`) | **Public Domain Hosting** with Caddy or Cloudflare |
+
+> [!CAUTION]
+> **CRITICAL: Do NOT enable Polling and Webhook mode simultaneously.**
+> Telegram allows only **one** delivery mechanism per bot token. If a webhook is active, Telegram rejects `getUpdates` polling requests with `409 Conflict: can't use getUpdates method while webhook is active`.
+> - If you host on a local Raspberry Pi on LAN: **Do NOT set a Telegram webhook**. The built-in polling loop handles all messages without needing a public domain.
+> - If you switch to Webhook mode: Ensure you register the webhook with your public HTTPS URL and `secret_token`.
+
+### Setting Up Telegram Webhook (Only for Public HTTPS Hosting)
+If hosting behind Caddy or a public domain, register the webhook with your secret token:
 ```bash
 curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "https://<your-host>/api/telegram?action=webhook",
+    "url": "https://keepalive.yourdomain.com/api/telegram?action=webhook",
     "secret_token": "YOUR_TELEGRAM_WEBHOOK_SECRET"
   }'
 ```
-Our backend verifies `X-Telegram-Bot-Api-Secret-Token` on every incoming webhook to prevent spoofed messages.
+To remove a webhook and switch back to Polling mode:
+```bash
+curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/deleteWebhook"
+```
 
 ---
 

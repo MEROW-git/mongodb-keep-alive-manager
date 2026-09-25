@@ -1,0 +1,28 @@
+# Caddyfile Example for Multi-DB Keep-Alive Manager
+# Usage:
+# 1. Replace "keepalive.example.com" with your actual domain name pointing to your Raspberry Pi IP.
+# 2. Place this file in /etc/caddy/Caddyfile or run with: caddy run --config Caddyfile.example
+
+keepalive.example.com {
+    # Automatic HTTPS (Let's Encrypt / ZeroSSL)
+    encode gzip zstd
+
+    # Reverse proxy to the local Keep-Alive server
+    reverse_proxy 127.0.0.1:5173
+
+    # Hardened Security Headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Optional Access & Error Logging
+    log {
+        output file /var/log/caddy/keepalive.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+}

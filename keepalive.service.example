@@ -1,0 +1,33 @@
+# Systemd Service Unit for Multi-DB Keep-Alive Manager
+# Installation on Raspberry Pi OS / Debian / Ubuntu:
+#   sudo cp keepalive.service.example /etc/systemd/system/keepalive.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now keepalive
+#   sudo systemctl status keepalive
+
+[Unit]
+Description=Multi-Database Keep-Alive Manager & Dashboard
+Documentation=https://github.com/your-repo/small_bot_keepdb_alive
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/small_bot_keepdb_alive
+Environment=NODE_ENV=production
+EnvironmentFile=/home/pi/small_bot_keepdb_alive/.env
+ExecStart=/usr/bin/node /home/pi/small_bot_keepdb_alive/server.cjs
+
+# Auto-restart on failure
+Restart=always
+RestartSec=10
+
+# Resource limits & Process Sandboxing
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=keepalive-manager
+
+[Install]
+WantedBy=multi-user.target

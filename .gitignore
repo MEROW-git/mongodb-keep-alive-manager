@@ -46,3 +46,12 @@ Thumbs.db
 coverage/
 tmp/
 scratch/
+
+# SSL Certificates & Private Keys
+*.key
+*.crt
+*.pfx
+privkey.pem
+fullchain.pem
+cert.pem
+chain.pem

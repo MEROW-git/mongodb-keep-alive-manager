@@ -92,3 +92,38 @@ body {
   border: 1px solid rgba(0, 237, 100, 0.25);
   box-shadow: 0 0 20px rgba(0, 237, 100, 0.08), inset 0 0 15px rgba(0, 237, 100, 0.04);
 }
+
+/* Futuristic Database Node Glowing Cards */
+.cyber-card-mongo {
+  border: 1px solid rgba(0, 237, 100, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cyber-card-mongo:hover {
+  border-color: rgba(0, 237, 100, 0.5);
+  box-shadow: 0 10px 30px -5px rgba(0, 237, 100, 0.15), 0 0 15px rgba(0, 237, 100, 0.1);
+  transform: translateY(-2px);
+}
+
+.cyber-card-postgres {
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cyber-card-postgres:hover {
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 10px 30px -5px rgba(56, 189, 248, 0.15), 0 0 15px rgba(56, 189, 248, 0.1);
+  transform: translateY(-2px);
+}
+
+.cyber-card-mysql {
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cyber-card-mysql:hover {
+  border-color: rgba(251, 191, 36, 0.5);
+  box-shadow: 0 10px 30px -5px rgba(251, 191, 36, 0.15), 0 0 15px rgba(251, 191, 36, 0.1);
+  transform: translateY(-2px);
+}
+
+.terminal-glow {
+  text-shadow: 0 0 12px currentColor;
+}

@@ -1,99 +1,73 @@
-﻿const path = require('path');
+const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
-const { MongoClient } = require('mongodb');
-const { isPostgresConfigured, pingPostgres } = require('../netlify/functions/lib/postgres');
-const { isMysqlConfigured, pingMysql } = require('../netlify/functions/lib/mysql');
+const { getMongoConfigs, pingMongoInstance, pingAllMongo } = require('../netlify/functions/lib/mongodb');
+const { getPostgresConfigs, pingPostgres, pingAllPostgres } = require('../netlify/functions/lib/postgres');
+const { getMysqlConfigs, pingMysql, pingAllMysql } = require('../netlify/functions/lib/mysql');
 
-async function testMongo() {
-  const uri = process.env.MONGO_URI;
-  const dbName = process.env.MONGO_DB_NAME || 'system_reset';
-  console.log('\n========================================');
-  console.log('🍃 Testing MongoDB Atlas Connection...');
-  console.log('Database:', dbName);
+async function testAllDatabases() {
+  console.log('========================================================');
+  console.log('🚀 Multi-Database Keep-Alive Connection & Ping Diagnostic');
+  console.log('========================================================\n');
 
-  if (!uri) {
-    console.error('❌ MONGO_URI is missing in .env');
-    return;
+  // 1. MongoDB
+  const mongoConfigs = getMongoConfigs();
+  console.log('🍃 MongoDB Instances Configured: ' + mongoConfigs.length + ' / 5');
+  if (mongoConfigs.length === 0) {
+    console.log('   ⚠️ No MongoDB URIs found (set MONGO_URI or MONGO_URI1..5)');
+  } else {
+    for (const cfg of mongoConfigs) {
+      console.log('   👉 [' + cfg.label + '] Target DB: ' + cfg.dbName + ' (Primary Storage: ' + (cfg.isPrimary ? 'YES' : 'NO') + ')');
+      const res = await pingMongoInstance(cfg.index);
+      if (res.status === 'SUCCESS') {
+        console.log('      ✅ Connected & Pinged in ' + res.responseTime + 'ms! Status: ONLINE');
+      } else {
+        console.log('      ❌ Ping FAILED (' + res.responseTime + 'ms): ' + (res.error || res.message));
+      }
+    }
   }
 
-  const client = new MongoClient(uri, {
-    serverSelectionTimeoutMS: 5000,
-    connectTimeoutMS: 5000,
-  });
-
-  try {
-    const startTime = Date.now();
-    await client.connect();
-    const connectTime = Date.now() - startTime;
-    console.log(`✅ MongoDB connected successfully in ${connectTime}ms!`);
-
-    const db = client.db(dbName);
-    const pingStart = Date.now();
-    const pingResult = await db.command({ ping: 1 });
-    const pingTime = Date.now() - pingStart;
-
-    console.log('Ping result:', pingResult);
-    console.log(`Ping response time: ${pingTime}ms`);
-
-    const collections = await db.listCollections().toArray();
-    console.log('Existing collections:', collections.map((c) => c.name));
-  } catch (err) {
-    console.error('❌ MongoDB Connection failed:', err.message);
-  } finally {
-    await client.close();
+  // 2. PostgreSQL
+  console.log('\n--------------------------------------------------------');
+  const pgConfigs = getPostgresConfigs();
+  console.log('🐘 PostgreSQL Instances Configured: ' + pgConfigs.length + ' / 5');
+  if (pgConfigs.length === 0) {
+    console.log('   ⚠️ No PostgreSQL URLs found (set postgresql_url or postgresql_url1..5)');
+  } else {
+    for (const cfg of pgConfigs) {
+      console.log('   👉 [' + cfg.label + '] Target DB: ' + cfg.dbName);
+      const res = await pingPostgres(cfg.index);
+      if (res.status === 'SUCCESS') {
+        console.log('      ✅ Connected & Pinged in ' + res.responseTime + 'ms! Database: ' + res.database + ' (Server Time: ' + res.timestamp + ')');
+      } else {
+        console.log('      ❌ Ping FAILED (' + res.responseTime + 'ms): ' + (res.error || res.message));
+      }
+    }
   }
+
+  // 3. MySQL
+  console.log('\n--------------------------------------------------------');
+  const myConfigs = getMysqlConfigs();
+  console.log('🐬 MySQL Instances Configured: ' + myConfigs.length + ' / 5');
+  if (myConfigs.length === 0) {
+    console.log('   ⚠️ No MySQL URLs found (set mysql_url or mysql_url1..5)');
+  } else {
+    for (const cfg of myConfigs) {
+      console.log('   👉 [' + cfg.label + '] Target DB: ' + cfg.dbName);
+      const res = await pingMysql(cfg.index);
+      if (res.status === 'SUCCESS') {
+        console.log('      ✅ Connected & Pinged in ' + res.responseTime + 'ms! Database: ' + res.database + ' (Server Time: ' + res.timestamp + ')');
+      } else {
+        console.log('      ❌ Ping FAILED (' + res.responseTime + 'ms): ' + (res.error || res.message));
+      }
+    }
+  }
+
+  console.log('\n========================================================');
+  console.log('✨ Diagnostic complete!');
+  console.log('========================================================\n');
 }
 
-async function testPostgres() {
-  console.log('\n========================================');
-  console.log('🐘 Testing PostgreSQL Connection...');
-
-  if (!isPostgresConfigured()) {
-    console.log('⚠️ postgresql_url is not configured in .env (Skipped)');
-    return;
-  }
-
-  console.log('Database target:', process.env.postgresql_db || 'postgresql');
-
-  try {
-    const res = await pingPostgres();
-    console.log(`✅ PostgreSQL connected & pinged successfully!`);
-    console.log(`Database: ${res.database}`);
-    console.log(`Latency: ${res.responseTime}ms`);
-    console.log(`Server Timestamp: ${res.timestamp}`);
-  } catch (err) {
-    console.error('❌ PostgreSQL Connection failed:', err.message);
-  }
-}
-
-async function testMysql() {
-  console.log('\n========================================');
-  console.log('🐬 Testing MySQL Connection...');
-
-  if (!isMysqlConfigured()) {
-    console.log('⚠️ mysql_url is not configured in .env (Skipped)');
-    return;
-  }
-
-  console.log('Database target:', process.env.mysql_db || process.env.MYSQL_DB || 'mysql');
-
-  try {
-    const res = await pingMysql();
-    console.log(`✅ MySQL connected & pinged successfully!`);
-    console.log(`Database: ${res.database}`);
-    console.log(`Latency: ${res.responseTime}ms`);
-    console.log(`Server Timestamp: ${res.timestamp}`);
-  } catch (err) {
-    console.error('❌ MySQL Connection failed:', err.message);
-  }
-}
-
-async function run() {
-  await testMongo();
-  await testPostgres();
-  await testMysql();
-  console.log('\n========================================\n');
-  process.exit(0);
-}
-
-run();
+testAllDatabases().then(() => process.exit(0)).catch((e) => {
+  console.error('Fatal error:', e);
+  process.exit(1);
+});

@@ -32,15 +32,21 @@ export default function Dashboard({
   const charts = dashboardData?.charts || {};
 
   const isOnline = dashboardData?.databaseStatus === 'ONLINE';
-  const isMultiDb = Boolean(dbInfo.postgres?.configured || dbInfo.mysql?.configured);
+  const allDatabasesList = React.useMemo(() => {
+    if (Array.isArray(dbInfo.allDatabases) && dbInfo.allDatabases.length > 0) {
+      return dbInfo.allDatabases;
+    }
+    const list = [
+      { type: "MongoDB", label: "MongoDB", name: dbInfo.name || "system_reset", badge: "Atlas" },
+      dbInfo.postgres?.configured && { type: "PostgreSQL", label: "PostgreSQL", name: dbInfo.postgres.name, badge: "Aiven" },
+      dbInfo.mysql?.configured && { type: "MySQL", label: "MySQL", name: dbInfo.mysql.name, badge: "Aiven" },
+    ].filter(Boolean);
+    return list;
+  }, [dbInfo]);
 
-  const configuredDatabasesList = [
-    'MongoDB',
-    dbInfo.postgres?.configured && 'PostgreSQL',
-    dbInfo.mysql?.configured && 'MySQL',
-  ].filter(Boolean);
+  const isMultiDb = allDatabasesList.length > 1;
+  const configuredDatabasesList = allDatabasesList.map((d) => d.label || d.type);
 
-  // 60fps Ultra-smooth countdown timer via requestAnimationFrame & direct DOM ref
   const progressBarRef = useRef(null);
   const isAutoPingingRef = useRef(false);
   const [countdownText, setCountdownText] = useState('--:--');
@@ -191,52 +197,44 @@ export default function Dashboard({
             </div>
 
             {/* Grid of database targets */}
-            <div className={`grid gap-2 ${configuredDatabasesList.length > 2 ? 'grid-cols-3' : configuredDatabasesList.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-              {/* MongoDB */}
-              <div className="bg-gray-900/90 border border-gray-800/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center hover:border-mongo/40 transition-colors">
-                <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium">
-                  <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-mongo shadow-[0_0_6px_rgba(0,237,100,0.6)]" />
-                    Mongo
-                  </span>
-                  <span className="text-[9px] font-mono text-gray-500">Atlas</span>
-                </div>
-                <div className="text-xs font-mono font-semibold text-mongo truncate mt-0.5" title={dbInfo.name || 'system_reset'}>
-                  {dbInfo.name || 'system_reset'}
-                </div>
-              </div>
+            <div className={`grid gap-2 ${
+              allDatabasesList.length > 3
+                ? "grid-cols-2 sm:grid-cols-3 max-h-56 overflow-y-auto pr-1"
+                : allDatabasesList.length === 3
+                ? "grid-cols-3"
+                : allDatabasesList.length === 2
+                ? "grid-cols-2"
+                : "grid-cols-1"
+            }`}>
+              {allDatabasesList.map((db, idx) => {
+                const isMongo = db.type === "MongoDB";
+                const isPg = db.type === "PostgreSQL";
+                const colorClass = isMongo
+                  ? "border-gray-800/80 hover:border-mongo/40 text-mongo"
+                  : isPg
+                  ? "border-gray-800/80 hover:border-sky-500/40 text-sky-400"
+                  : "border-gray-800/80 hover:border-amber-400/40 text-amber-400";
+                const dotColor = isMongo
+                  ? "bg-mongo shadow-[0_0_6px_rgba(0,237,100,0.6)]"
+                  : isPg
+                  ? "bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]"
+                  : "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]";
 
-              {/* PostgreSQL */}
-              {dbInfo.postgres?.configured && (
-                <div className="bg-gray-900/90 border border-gray-800/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center hover:border-sky-500/40 transition-colors">
-                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium">
-                    <span className="flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]" />
-                      Postgres
-                    </span>
-                    <span className="text-[9px] font-mono text-gray-500">Aiven</span>
+                return (
+                  <div key={idx} className={`bg-gray-900/90 border rounded-xl px-2.5 py-1.5 flex flex-col justify-center transition-colors ${colorClass}`}>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium">
+                      <span className="flex items-center gap-1">
+                        <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                        {db.label}
+                      </span>
+                      <span className="text-[9px] font-mono text-gray-500">{db.badge || (isMongo ? "Atlas" : "Aiven")}</span>
+                    </div>
+                    <div className={`text-xs font-mono font-semibold truncate mt-0.5 ${isMongo ? "text-mongo" : isPg ? "text-sky-400" : "text-amber-400"}`} title={db.name}>
+                      {db.name || "defaultdb"}
+                    </div>
                   </div>
-                  <div className="text-xs font-mono font-semibold text-sky-400 truncate mt-0.5" title={dbInfo.postgres.name || 'defaultdb'}>
-                    {dbInfo.postgres.name || 'defaultdb'}
-                  </div>
-                </div>
-              )}
-
-              {/* MySQL */}
-              {dbInfo.mysql?.configured && (
-                <div className="bg-gray-900/90 border border-gray-800/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center hover:border-amber-400/40 transition-colors">
-                  <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium">
-                    <span className="flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]" />
-                      MySQL
-                    </span>
-                    <span className="text-[9px] font-mono text-gray-500">Aiven</span>
-                  </div>
-                  <div className="text-xs font-mono font-semibold text-amber-400 truncate mt-0.5" title={dbInfo.mysql.name || 'defaultdb'}>
-                    {dbInfo.mysql.name || 'defaultdb'}
-                  </div>
-                </div>
-              )}
+                );
+              })}
             </div>
 
             {/* Bottom metadata row */}
@@ -394,48 +392,41 @@ export default function Dashboard({
               <h3 className="text-sm font-semibold text-white">Database Information</h3>
             </div>
 
-            <div className="space-y-2.5 font-mono text-xs">
-              <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
-                <span className="text-gray-300 font-sans flex items-center gap-2 text-xs">
-                  <span className="w-2 h-2 rounded-full bg-mongo shadow-[0_0_6px_rgba(0,237,100,0.6)]" />
-                  MongoDB
-                  <span className="text-[10px] font-mono text-gray-500 bg-gray-800/80 px-1.5 py-0.5 rounded">Atlas</span>
-                </span>
-                <span className="font-bold text-mongo truncate">{dbInfo.name || 'system_reset'}</span>
-              </div>
+            <div className="space-y-2.5 font-mono text-xs max-h-60 overflow-y-auto pr-1">
+              {allDatabasesList.map((db, idx) => {
+                const isMongo = db.type === "MongoDB";
+                const isPg = db.type === "PostgreSQL";
+                const dotColor = isMongo
+                  ? "bg-mongo shadow-[0_0_6px_rgba(0,237,100,0.6)]"
+                  : isPg
+                  ? "bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]"
+                  : "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]";
+                const textColor = isMongo ? "text-mongo" : isPg ? "text-sky-400" : "text-amber-400";
 
-              {dbInfo.postgres?.configured && (
-                <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
-                  <span className="text-gray-300 font-sans flex items-center gap-2 text-xs">
-                    <span className="w-2 h-2 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]" />
-                    PostgreSQL
-                    <span className="text-[10px] font-mono text-gray-500 bg-gray-800/80 px-1.5 py-0.5 rounded">Aiven</span>
-                  </span>
-                  <span className="font-bold text-sky-400 truncate">{dbInfo.postgres.name || 'defaultdb'}</span>
-                </div>
-              )}
-
-              {dbInfo.mysql?.configured && (
-                <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
-                  <span className="text-gray-300 font-sans flex items-center gap-2 text-xs">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]" />
-                    MySQL
-                    <span className="text-[10px] font-mono text-gray-500 bg-gray-800/80 px-1.5 py-0.5 rounded">Aiven</span>
-                  </span>
-                  <span className="font-bold text-amber-400 truncate">{dbInfo.mysql.name || 'mysql'}</span>
-                </div>
-              )}
+                return (
+                  <div key={idx} className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
+                    <span className="text-gray-300 font-sans flex items-center gap-2 text-xs">
+                      <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+                      {db.label}
+                      <span className="text-[10px] font-mono text-gray-500 bg-gray-800/80 px-1.5 py-0.5 rounded">
+                        {db.badge || (isMongo ? "Atlas" : "Aiven")}
+                      </span>
+                    </span>
+                    <span className={`font-bold truncate ${textColor}`}>{db.name || "defaultdb"}</span>
+                  </div>
+                );
+              })}
 
               <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
                 <span className="text-gray-400 font-sans">Target Collection</span>
-                <span className="font-bold text-mongo truncate">{dbInfo.collection || 'sysreset'}</span>
+                <span className="font-bold text-mongo truncate">{dbInfo.collection || "sysreset"}</span>
               </div>
 
               <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center gap-2">
                 <span className="text-gray-400 font-sans">Connection</span>
                 <span className="inline-flex items-center space-x-1.5 text-mongo font-bold shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-mongo" />
-                  <span>{dbInfo.connection || 'Connected'}</span>
+                  <span>{dbInfo.connection || "Connected"}</span>
                 </span>
               </div>
             </div>

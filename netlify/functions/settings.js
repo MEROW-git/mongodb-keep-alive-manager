@@ -1,15 +1,28 @@
-﻿const { connectToDatabase } = require('./lib/mongodb');
+const { connectToDatabase, getMongoConfigs } = require('./lib/mongodb');
+const { getPostgresConfigs } = require('./lib/postgres');
+const { getMysqlConfigs } = require('./lib/mysql');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 
-function maskMongoUri(uri) {
+function maskUri(uri) {
   if (!uri) return 'Not configured';
   try {
-    // Extract hostname only, masking all credentials completely
-    const parsed = new URL(uri.replace(/^mongodb\+srv:\/\//, 'http://'));
-    const host = parsed.hostname || 'cluster.mongodb.net';
-    return `mongodb+srv://••••••••:••••••••@${host}`;
+    const hasSrv = uri.startsWith('mongodb+srv://');
+    let parseable = uri;
+    if (hasSrv) {
+      parseable = uri.replace(/^mongodb+srv:\/\//, 'http://');
+    } else if (uri.startsWith('mongodb://')) {
+      parseable = uri.replace(/^mongodb:\/\//, 'http://');
+    } else if (uri.startsWith('postgres://') || uri.startsWith('postgresql://')) {
+      parseable = uri.replace(/^postgres(ql)?:\/\//, 'http://');
+    } else if (uri.startsWith('mysql://')) {
+      parseable = uri.replace(/^mysql:\/\//, 'http://');
+    }
+    const parsed = new URL(parseable);
+    const host = parsed.host || 'cluster.database.net';
+    const proto = hasSrv ? 'mongodb+srv' : uri.split('://')[0];
+    return `${proto}://••••••••:••••••••@${host}`;
   } catch (e) {
-    return 'mongodb+srv://••••••••:••••••••@cluster.mongodb.net';
+    return '••••••••:••••••••@cluster';
   }
 }
 
@@ -33,7 +46,7 @@ exports.handler = async (event, context) => {
     });
   }
 
-  const rawUri = process.env.MONGO_URI || '';
+  const rawUri = process.env.MONGO_URI || process.env.MONGO_URI1 || '';
   const dbName = process.env.MONGO_DB_NAME || 'system_reset';
   const collectionName = process.env.WEBADMIN_COLLECTION || 'sysreset';
 
@@ -49,6 +62,38 @@ exports.handler = async (event, context) => {
         await settingsCol.insertOne({ ...settings, updatedAt: new Date() });
       }
 
+      const mongoConfigs = getMongoConfigs();
+      const postgresConfigs = getPostgresConfigs();
+      const mysqlConfigs = getMysqlConfigs();
+
+      const allDatabases = [
+        ...mongoConfigs.map((c) => ({
+          type: 'MongoDB',
+          badge: 'Atlas',
+          index: c.index,
+          label: c.label,
+          dbName: c.dbName,
+          maskedUri: maskUri(c.uri),
+          isPrimary: c.isPrimary,
+        })),
+        ...postgresConfigs.map((c) => ({
+          type: 'PostgreSQL',
+          badge: 'Aiven',
+          index: c.index,
+          label: c.label,
+          dbName: c.dbName,
+          maskedUri: maskUri(c.url),
+        })),
+        ...mysqlConfigs.map((c) => ({
+          type: 'MySQL',
+          badge: 'Aiven',
+          index: c.index,
+          label: c.label,
+          dbName: c.dbName,
+          maskedUri: maskUri(c.url),
+        })),
+      ];
+
       return jsonResponse(200, {
         status: 'success',
         settings: {
@@ -59,8 +104,12 @@ exports.handler = async (event, context) => {
         database: {
           name: dbName,
           collection: collectionName,
-          maskedUri: maskMongoUri(rawUri),
+          maskedUri: maskUri(rawUri),
           connectionStatus: 'Connected',
+          allDatabases,
+          mongoList: mongoConfigs.map((c) => ({ index: c.index, label: c.label, dbName: c.dbName, maskedUri: maskUri(c.uri) })),
+          postgresList: postgresConfigs.map((c) => ({ index: c.index, label: c.label, dbName: c.dbName, maskedUri: maskUri(c.url) })),
+          mysqlList: mysqlConfigs.map((c) => ({ index: c.index, label: c.label, dbName: c.dbName, maskedUri: maskUri(c.url) })),
         },
       });
     }

@@ -1,6 +1,6 @@
-const { connectToDatabase } = require('./lib/mongodb');
-const { isPostgresConfigured, pingPostgres } = require('./lib/postgres');
-const { isMysqlConfigured, pingMysql } = require('./lib/mysql');
+const { connectToDatabase, pingAllMongo } = require('./lib/mongodb');
+const { pingAllPostgres } = require('./lib/postgres');
+const { pingAllMysql } = require('./lib/mysql');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 const { notifyPingSuccess } = require('./lib/telegramNotifier');
 
@@ -14,10 +14,6 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Security check: Allow execution only if:
-  // 1. Invoked by Netlify scheduled event or background runner
-  // 2. Valid JWT user token provided (logged-in admin)
-  // 3. Valid CRON_SECRET provided via query param (?key=...) or header (x-cron-secret)
   const authHeader = event.headers.authorization || event.headers.Authorization;
   const decoded = verifyToken(authHeader);
 
@@ -25,7 +21,7 @@ exports.handler = async (event, context) => {
   const providedSecret =
     event.headers['x-cron-secret'] ||
     event.headers['X-Cron-Secret'] ||
-    (authHeader && cronSecret && authHeader === "Bearer " + cronSecret ? cronSecret : null) ||
+    (authHeader && cronSecret && authHeader === 'Bearer ' + cronSecret ? cronSecret : null) ||
     event.queryStringParameters?.key;
 
   const isNetlifyScheduled = event.type === 'schedule' || Boolean(context?.clientContext?.custom?.scheduled);
@@ -46,146 +42,31 @@ exports.handler = async (event, context) => {
     const { db } = await connectToDatabase();
     const logsCol = db.collection('logs');
 
-    // 1. Ping MongoDB
-    const mongoStart = Date.now();
-    try {
-      const pingResult = await db.command({ ping: 1 });
-      const mongoLatency = Date.now() - mongoStart;
+    // Execute pings across all configured databases (up to 5 of each type)
+    const [mongoResults, pgResults, mysqlResults] = await Promise.all([
+      pingAllMongo(),
+      pingAllPostgres(),
+      pingAllMysql(),
+    ]);
 
+    const allPingRuns = [...mongoResults, ...pgResults, ...mysqlResults];
+
+    for (const res of allPingRuns) {
       await logsCol.insertOne({
         action: 'PING',
-        target: 'MongoDB',
-        status: 'SUCCESS',
-        database: mongoDbName,
-        responseTime: mongoLatency,
+        target: res.target,
+        status: res.status,
+        database: res.database,
+        responseTime: res.responseTime,
+        error: res.error || null,
         source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
         createdAt: new Date(),
       });
 
-      pingResults.push({
-        target: 'MongoDB',
-        status: 'SUCCESS',
-        database: mongoDbName,
-        responseTime: mongoLatency,
-        pingResult,
-      });
-    } catch (mongoErr) {
-      const mongoLatency = Date.now() - mongoStart;
-      console.error('MongoDB Ping operation failed:', mongoErr.message);
-
-      await logsCol.insertOne({
-        action: 'PING',
-        target: 'MongoDB',
-        status: 'FAILED',
-        database: mongoDbName,
-        responseTime: mongoLatency,
-        error: mongoErr.message || 'Database ping error',
-        source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
-        createdAt: new Date(),
-      });
-
-      pingResults.push({
-        target: 'MongoDB',
-        status: 'FAILED',
-        database: mongoDbName,
-        responseTime: mongoLatency,
-        error: 'Ping operation failed',
-      });
+      pingResults.push(res);
     }
 
-    // 2. Ping PostgreSQL (if configured)
-    if (isPostgresConfigured()) {
-      const pgStart = Date.now();
-      try {
-        const pgRes = await pingPostgres();
-        await logsCol.insertOne({
-          action: 'PING',
-          target: 'PostgreSQL',
-          status: 'SUCCESS',
-          database: pgRes.database,
-          responseTime: pgRes.responseTime,
-          source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
-          createdAt: new Date(),
-        });
-
-        pingResults.push({
-          target: 'PostgreSQL',
-          status: 'SUCCESS',
-          database: pgRes.database,
-          responseTime: pgRes.responseTime,
-        });
-      } catch (pgErr) {
-        const pgLatency = Date.now() - pgStart;
-        console.error('PostgreSQL Ping operation failed:', pgErr.message);
-
-        await logsCol.insertOne({
-          action: 'PING',
-          target: 'PostgreSQL',
-          status: 'FAILED',
-          database: process.env.postgresql_db || 'postgresql',
-          responseTime: pgLatency,
-          error: pgErr.message || 'PostgreSQL ping error',
-          source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
-          createdAt: new Date(),
-        });
-
-        pingResults.push({
-          target: 'PostgreSQL',
-          status: 'FAILED',
-          database: process.env.postgresql_db || 'postgresql',
-          responseTime: pgLatency,
-          error: 'PostgreSQL ping error',
-        });
-      }
-    }
-
-    // 3. Ping MySQL (if configured)
-    if (isMysqlConfigured()) {
-      const mysqlStart = Date.now();
-      try {
-        const mysqlRes = await pingMysql();
-        await logsCol.insertOne({
-          action: 'PING',
-          target: 'MySQL',
-          status: 'SUCCESS',
-          database: mysqlRes.database,
-          responseTime: mysqlRes.responseTime,
-          source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
-          createdAt: new Date(),
-        });
-
-        pingResults.push({
-          target: 'MySQL',
-          status: 'SUCCESS',
-          database: mysqlRes.database,
-          responseTime: mysqlRes.responseTime,
-        });
-      } catch (mysqlErr) {
-        const mysqlLatency = Date.now() - mysqlStart;
-        console.error('MySQL Ping operation failed:', mysqlErr.message);
-
-        await logsCol.insertOne({
-          action: 'PING',
-          target: 'MySQL',
-          status: 'FAILED',
-          database: process.env.mysql_db || process.env.MYSQL_DB || 'mysql',
-          responseTime: mysqlLatency,
-          error: mysqlErr.message || 'MySQL ping error',
-          source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
-          createdAt: new Date(),
-        });
-
-        pingResults.push({
-          target: 'MySQL',
-          status: 'FAILED',
-          database: process.env.mysql_db || process.env.MYSQL_DB || 'mysql',
-          responseTime: mysqlLatency,
-          error: 'MySQL ping error',
-        });
-      }
-    }
-
-    // 4. Broadcast keep-alive notification to approved Telegram subscribers
+    // Broadcast keep-alive notification to approved Telegram subscribers
     notifyPingSuccess({
       results: pingResults,
       source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
@@ -211,7 +92,7 @@ exports.handler = async (event, context) => {
     console.error('Overall ping handler failed:', error.message);
     return jsonResponse(500, {
       status: 'error',
-      message: 'Keep-alive ping execution failed',
+      message: 'Keep-alive ping execution failed: ' + error.message,
       timestamp: new Date().toISOString(),
     });
   }

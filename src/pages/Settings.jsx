@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
-import { Sliders, Save, Database, ShieldCheck, CheckCircle2, AlertCircle, Copy, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sliders, Save, Database, ShieldCheck, CheckCircle2, AlertCircle, Copy, Check, Layers } from 'lucide-react';
 import api from '../services/api';
 
 export default function Settings({ onSettingsUpdated }) {
@@ -9,7 +9,15 @@ export default function Settings({ onSettingsUpdated }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
-  const [copied, setCopied] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(null);
+
+  const handleCopyUri = (uri, key = 'primary') => {
+    if (uri) {
+      navigator.clipboard.writeText(uri);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    }
+  };
 
   useEffect(() => {
     async function loadSettings() {
@@ -54,13 +62,7 @@ export default function Settings({ onSettingsUpdated }) {
     }
   };
 
-  const handleCopyUri = () => {
-    if (databaseInfo.maskedUri) {
-      navigator.clipboard.writeText(databaseInfo.maskedUri);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -164,48 +166,103 @@ export default function Settings({ onSettingsUpdated }) {
 
         {/* Database Information (Read-only / Security) */}
         <div className="glass-panel rounded-2xl p-6 bg-cardBg/90 border border-gray-800/80 space-y-4">
-          <div className="flex items-center space-x-2">
-            <Database className="w-4 h-4 text-mongo" />
-            <h2 className="text-sm font-semibold text-white uppercase tracking-wider text-gray-300">
-              Database Configuration
-            </h2>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Database className="w-4 h-4 text-mongo" />
+              <h2 className="text-sm font-semibold text-white uppercase tracking-wider text-gray-300">
+                Database Configuration
+              </h2>
+            </div>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              {(databaseInfo.allDatabases || [1]).length} Configured
+            </span>
           </div>
 
           <div className="space-y-3 text-xs font-mono">
-            {/* Masked URI */}
-            <div className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800">
-              <div className="flex items-center justify-between text-gray-400 mb-1 font-sans">
-                <span className="font-semibold">MongoDB URI:</span>
-                <span className="text-[10px] text-gray-500 uppercase">(Hidden / Protected)</span>
-              </div>
-              <div className="flex items-center justify-between gap-2 mt-1">
-                <code className="text-gray-300 text-xs truncate max-w-lg">
-                  {databaseInfo.maskedUri || 'Loading...'}
-                </code>
-                <button
-                  type="button"
-                  onClick={handleCopyUri}
-                  title="Copy masked URI"
-                  className="p-1.5 rounded-lg bg-gray-800 text-gray-300 hover:text-white shrink-0"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5 text-mongo" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            </div>
+            {(databaseInfo.allDatabases && databaseInfo.allDatabases.length > 0
+              ? databaseInfo.allDatabases
+              : [{ type: "MongoDB", label: "MongoDB", dbName: databaseInfo.name, maskedUri: databaseInfo.maskedUri, badge: "Atlas" }]
+            ).map((db, idx) => {
+              const isMongo = db.type === "MongoDB";
+              const isPg = db.type === "PostgreSQL";
+              const dotColor = isMongo
+                ? "bg-mongo shadow-[0_0_6px_rgba(0,237,100,0.6)]"
+                : isPg
+                ? "bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]"
+                : "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]";
+              const textColor = isMongo ? "text-mongo" : isPg ? "text-sky-400" : "text-amber-400";
+              const isCopied = copiedKey === `db_${idx}`;
 
-            {/* DB Name & Collection */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center font-sans">
-                <span className="text-gray-400">Database:</span>
-                <span className="font-mono font-bold text-white">{databaseInfo.name || 'system_reset'}</span>
-              </div>
+              return (
+                <div key={idx} className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800 space-y-2">
+                  <div className="flex items-center justify-between font-sans">
+                    <span className="flex items-center gap-1.5 font-semibold text-white">
+                      <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+                      {db.label}
+                      <span className="text-[10px] font-mono text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded">
+                        {db.badge || (isMongo ? "Atlas" : "Aiven")}
+                      </span>
+                      {db.isPrimary && (
+                        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                          Primary
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-gray-400 text-xs font-mono">
+                      Database: <strong className={textColor}>{db.dbName || "system_reset"}</strong>
+                    </span>
+                  </div>
 
-              <div className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800 flex justify-between items-center font-sans">
-                <span className="text-gray-400">Collection:</span>
-                <span className="font-mono font-bold text-mongo">{databaseInfo.collection || 'sysreset'}</span>
-              </div>
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <code className="text-gray-300 text-xs truncate max-w-lg">
+                      {db.maskedUri || "Loading..."}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyUri(db.maskedUri, `db_${idx}`)}
+                      title={`Copy ${db.label} URI`}
+                      className="p-1.5 rounded-lg bg-gray-800 text-gray-300 hover:text-white shrink-0"
+                    >
+                      {isCopied ? <Check className="w-3.5 h-3.5 text-mongo" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            <div className="p-3 rounded-xl bg-gray-950/60 border border-gray-800 flex justify-between items-center font-sans text-xs">
+              <span className="text-gray-400">Target System Collection:</span>
+              <span className="font-mono font-bold text-mongo">{databaseInfo.collection || "sysreset"}</span>
             </div>
           </div>
+        </div>
+
+        {/* Multi-Database Scaling Guide */}
+        <div className="glass-panel rounded-2xl p-6 bg-cardBg/90 border border-gray-800/80 space-y-3">
+          <div className="flex items-center space-x-2">
+            <Layers className="w-4 h-4 text-sky-400" />
+            <h2 className="text-sm font-semibold text-white">Multi-Database Scaling (Up to 5 Each)</h2>
+          </div>
+          <p className="text-xs text-gray-400 leading-relaxed">
+            Need to monitor additional databases? You can configure up to 5 connections for each engine in your <code className="text-mongo">.env</code> file:
+          </p>
+          <div className="p-3.5 rounded-xl bg-gray-950 border border-gray-800 space-y-2 font-mono text-xs text-gray-300">
+            <div>
+              <span className="text-mongo font-semibold">🍃 MongoDB:</span>{' '}
+              <code className="text-gray-400">MONGO_URI, MONGO_URI2, MONGO_URI3, MONGO_URI4, MONGO_URI5</code>
+            </div>
+            <div>
+              <span className="text-sky-400 font-semibold">🐘 PostgreSQL:</span>{' '}
+              <code className="text-gray-400">postgresql_url, postgresql_url2, postgresql_url3, postgresql_url4, postgresql_url5</code>
+            </div>
+            <div>
+              <span className="text-amber-400 font-semibold">🐬 MySQL:</span>{' '}
+              <code className="text-gray-400">mysql_url, mysql_url2, mysql_url3, mysql_url4, mysql_url5</code>
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-500">
+            💡 Databases defined in your environment are automatically detected on startup and included in automated keep-alive cycles.
+          </p>
         </div>
 
         {/* Serverless Deployment & Cron Trigger Info */}

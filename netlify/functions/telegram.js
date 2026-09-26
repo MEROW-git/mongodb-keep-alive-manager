@@ -1,6 +1,6 @@
-const { connectToDatabase } = require('./lib/mongodb');
-const { pingPostgres, isPostgresConfigured } = require('./lib/postgres');
-const { pingMysql, isMysqlConfigured } = require('./lib/mysql');
+const { connectToDatabase, pingAllMongo, getMongoConfigs } = require('./lib/mongodb');
+const { pingAllPostgres, isPostgresConfigured, getPostgresConfigs } = require('./lib/postgres');
+const { pingAllMysql, isMysqlConfigured, getMysqlConfigs } = require('./lib/mysql');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 require('dotenv').config();
 
@@ -60,25 +60,11 @@ async function sendSafeTelegramMessage(chatId, text, options = {}) {
  * Dynamic Reply Keyboard for authorized users displaying all 3 databases
  */
 function getAuthorizedKeyboard() {
-  const hasPg = isPostgresConfigured();
-  const hasMy = isMysqlConfigured();
-
   const keyboard = [
-    // Row 1: Global Operations
     [{ text: '📊 All DBs Status' }, { text: '⚡ Instant Multi-Ping' }],
+    [{ text: '🍃 MongoDB' }, { text: '🐘 PostgreSQL' }, { text: '🐬 MySQL' }],
+    [{ text: '🆔 My ID' }, { text: '❓ Help' }],
   ];
-
-  // Row 2: Dedicated Individual Database Buttons
-  const dbRow = [{ text: '🍃 MongoDB' }];
-  if (hasPg) dbRow.push({ text: '🐘 PostgreSQL' });
-  if (hasMy) dbRow.push({ text: '🐬 MySQL' });
-  keyboard.push(dbRow);
-
-  // Row 3: Identity & Help
-  keyboard.push([
-    { text: '🆔 My ID' },
-    { text: '❓ Help' },
-  ]);
 
   return {
     keyboard,
@@ -247,168 +233,104 @@ async function processTelegramMessage(db, message) {
 
   // --- 🍃 MongoDB Dedicated Status ---
   if (isMongo) {
-    const mongoStart = Date.now();
-    try {
-      await db.command({ ping: 1 });
-      const latency = Date.now() - mongoStart;
-      const mongoText =
-        `🍃 <b>MongoDB Atlas Status: ONLINE</b>\n\n` +
-        `• <b>Database:</b> <code>${dbName}</code>\n` +
-        `• <b>Target Collection:</b> <code>${mainCollection}</code>\n` +
-        `• <b>Latency:</b> <code>${latency} ms</code>\n` +
-        `• <b>TLS:</b> Encrypted TLS\n` +
-        `• <b>Timestamp:</b> <code>${getTimeString()}</code>\n\n` +
-        `✨ <i>MongoDB keep-alive verified healthy and active.</i>`;
-
-      await sendSafeTelegramMessage(chatId, mongoText, { reply_markup: replyMarkup });
-      return { status: 'mongo_status_sent', userId, latency };
-    } catch (err) {
-      await sendSafeTelegramMessage(
-        chatId,
-        `🍃 <b>MongoDB Atlas Status: OFFLINE 🔴</b>\n\n` +
-        `• <b>Database:</b> <code>${dbName}</code>\n` +
-        `• <b>Error:</b> <i>${escapeHtml(err.message)}</i>\n` +
-        `• <b>Timestamp:</b> <code>${getTimeString()}</code>`,
-        { reply_markup: replyMarkup }
-      );
-      return { status: 'mongo_status_error', userId };
+    const mongoResults = await pingAllMongo();
+    if (mongoResults.length === 0) {
+      await sendSafeTelegramMessage(chatId, '🍃 <b>MongoDB is not configured</b> in your .env variables.', { reply_markup: replyMarkup });
+      return { status: 'mongo_not_configured', userId };
     }
+
+    const lines = mongoResults.map((r) => {
+      if (r.status === 'SUCCESS') {
+        return `• <b>${r.target}:</b> 🟢 ONLINE (<code>${r.responseTime} ms</code>)\n  Database: <code>${r.database}</code>`;
+      } else {
+        return `• <b>${r.target}:</b> 🔴 OFFLINE\n  Error: <i>${escapeHtml(r.error)}</i>`;
+      }
+    });
+
+    const mongoText =
+      `🍃 <b>MongoDB Status Report</b>\n\n` +
+      lines.join('\n\n') +
+      `\n\n🕒 <b>Timestamp:</b> <code>${getTimeString()}</code>\n` +
+      `✨ <i>Keep-alive verified healthy and active.</i>`;
+
+    await sendSafeTelegramMessage(chatId, mongoText, { reply_markup: replyMarkup });
+    return { status: 'mongo_status_sent', userId };
   }
 
   // --- 🐘 PostgreSQL Dedicated Status ---
   if (isPostgres) {
-    if (!hasPg) {
-      await sendSafeTelegramMessage(
-        chatId,
-        `🐘 <b>PostgreSQL is not configured</b> in your .env variables.`,
-        { reply_markup: replyMarkup }
-      );
+    const pgResults = await pingAllPostgres();
+    if (pgResults.length === 0) {
+      await sendSafeTelegramMessage(chatId, '🐘 <b>PostgreSQL is not configured</b> in your .env variables.', { reply_markup: replyMarkup });
       return { status: 'pg_not_configured', userId };
     }
 
-    try {
-      const pgRes = await pingPostgres();
-      const pgText =
-        `🐘 <b>PostgreSQL Status: ${pgRes.status === 'SUCCESS' ? 'ONLINE 🟢' : 'FAILED 🔴'}</b>\n\n` +
-        `• <b>Database:</b> <code>${pgRes.database || 'defaultdb'}</code>\n` +
-        `• <b>Response Time:</b> <code>${pgRes.responseTime || 0} ms</code>\n` +
-        `• <b>SSL Verification:</b> 🔒 Strict Verified (<code>ca.pem</code>)\n` +
-        `• <b>Timestamp:</b> <code>${getTimeString()}</code>\n\n` +
-        `✨ <i>PostgreSQL connection pool verified active.</i>`;
+    const lines = pgResults.map((r) => {
+      if (r.status === 'SUCCESS') {
+        return `• <b>${r.target}:</b> 🟢 ONLINE (<code>${r.responseTime} ms</code>)\n  Database: <code>${r.database}</code>`;
+      } else {
+        return `• <b>${r.target}:</b> 🔴 OFFLINE\n  Error: <i>${escapeHtml(r.error)}</i>`;
+      }
+    });
 
-      await sendSafeTelegramMessage(chatId, pgText, { reply_markup: replyMarkup });
-      return { status: 'pg_status_sent', userId };
-    } catch (err) {
-      await sendSafeTelegramMessage(
-        chatId,
-        `🐘 <b>PostgreSQL Status: OFFLINE 🔴</b>\n\n` +
-        `• <b>Error:</b> <i>${escapeHtml(err.message)}</i>\n` +
-        `• <b>Timestamp:</b> <code>${getTimeString()}</code>`,
-        { reply_markup: replyMarkup }
-      );
-      return { status: 'pg_status_error', userId };
-    }
+    const pgText =
+      `🐘 <b>PostgreSQL Status Report</b>\n\n` +
+      lines.join('\n\n') +
+      `\n\n🔒 <b>SSL Verification:</b> Strict Verified (<code>ca.pem</code>)\n` +
+      `🕒 <b>Timestamp:</b> <code>${getTimeString()}</code>`;
+
+    await sendSafeTelegramMessage(chatId, pgText, { reply_markup: replyMarkup });
+    return { status: 'pg_status_sent', userId };
   }
 
   // --- 🐬 MySQL Dedicated Status ---
   if (isMysql) {
-    if (!hasMy) {
-      await sendSafeTelegramMessage(
-        chatId,
-        `🐬 <b>MySQL is not configured</b> in your .env variables.`,
-        { reply_markup: replyMarkup }
-      );
+    const myResults = await pingAllMysql();
+    if (myResults.length === 0) {
+      await sendSafeTelegramMessage(chatId, '🐬 <b>MySQL is not configured</b> in your .env variables.', { reply_markup: replyMarkup });
       return { status: 'my_not_configured', userId };
     }
 
-    try {
-      const myRes = await pingMysql();
-      const myText =
-        `🐬 <b>MySQL Status: ${myRes.status === 'SUCCESS' ? 'ONLINE 🟢' : 'FAILED 🔴'}</b>\n\n` +
-        `• <b>Database:</b> <code>${myRes.database || 'defaultdb'}</code>\n` +
-        `• <b>Response Time:</b> <code>${myRes.responseTime || 0} ms</code>\n` +
-        `• <b>SSL Verification:</b> 🔒 Strict Verified (<code>ca.pem</code>)\n` +
-        `• <b>Timestamp:</b> <code>${getTimeString()}</code>\n\n` +
-        `✨ <i>MySQL connection pool verified active.</i>`;
+    const lines = myResults.map((r) => {
+      if (r.status === 'SUCCESS') {
+        return `• <b>${r.target}:</b> 🟢 ONLINE (<code>${r.responseTime} ms</code>)\n  Database: <code>${r.database}</code>`;
+      } else {
+        return `• <b>${r.target}:</b> 🔴 OFFLINE\n  Error: <i>${escapeHtml(r.error)}</i>`;
+      }
+    });
 
-      await sendSafeTelegramMessage(chatId, myText, { reply_markup: replyMarkup });
-      return { status: 'my_status_sent', userId };
-    } catch (err) {
-      await sendSafeTelegramMessage(
-        chatId,
-        `🐬 <b>MySQL Status: OFFLINE 🔴</b>\n\n` +
-        `• <b>Error:</b> <i>${escapeHtml(err.message)}</i>\n` +
-        `• <b>Timestamp:</b> <code>${getTimeString()}</code>`,
-        { reply_markup: replyMarkup }
-      );
-      return { status: 'my_status_error', userId };
-    }
+    const myText =
+      `🐬 <b>MySQL Status Report</b>\n\n` +
+      lines.join('\n\n') +
+      `\n\n🔒 <b>SSL Verification:</b> Strict Verified (<code>ca.pem</code>)\n` +
+      `🕒 <b>Timestamp:</b> <code>${getTimeString()}</code>`;
+
+    await sendSafeTelegramMessage(chatId, myText, { reply_markup: replyMarkup });
+    return { status: 'my_status_sent', userId };
   }
 
   // --- 📊 All DBs Status (Overview) ---
   if (isAllStatus) {
-    const mongoStart = Date.now();
-    let mongoRes;
-    try {
-      await db.command({ ping: 1 });
-      mongoRes = { status: 'SUCCESS', responseTime: Date.now() - mongoStart, database: dbName };
-    } catch (e) {
-      mongoRes = { status: 'FAILED', responseTime: 0, error: e.message, database: dbName };
-    }
+    const [mongoResults, pgResults, mysqlResults] = await Promise.all([
+      pingAllMongo(),
+      pingAllPostgres(),
+      pingAllMysql(),
+    ]);
 
-    let pgRes = null;
-    if (hasPg) {
-      try {
-        pgRes = await pingPostgres();
-      } catch (e) {
-        pgRes = { status: 'FAILED', responseTime: 0, error: e.message, database: process.env.postgresql_db || 'postgresql' };
-      }
-    }
-
-    let myRes = null;
-    if (hasMy) {
-      try {
-        myRes = await pingMysql();
-      } catch (e) {
-        myRes = { status: 'FAILED', responseTime: 0, error: e.message, database: process.env.mysql_db || 'mysql' };
-      }
-    }
-
-    const lines = [];
-    let successCount = 0;
-    let totalCount = 1;
-
-    // Mongo
-    if (mongoRes.status === 'SUCCESS') {
-      successCount++;
-      lines.push(`🍃 <b>MongoDB Atlas:</b> 🟢 ONLINE (<code>${mongoRes.responseTime} ms</code>)\n   • DB: <code>${mongoRes.database}</code>`);
-    } else {
-      lines.push(`🍃 <b>MongoDB Atlas:</b> 🔴 OFFLINE\n   • Error: <i>${escapeHtml(mongoRes.error)}</i>`);
-    }
-
-    // Postgres
-    if (hasPg && pgRes) {
-      totalCount++;
-      if (pgRes.status === 'SUCCESS') {
-        successCount++;
-        lines.push(`🐘 <b>PostgreSQL:</b> 🟢 ONLINE (<code>${pgRes.responseTime} ms</code>)\n   • DB: <code>${pgRes.database}</code>`);
+    const allRuns = [...mongoResults, ...pgResults, ...mysqlResults];
+    const lines = allRuns.map((r) => {
+      const icon = r.target.startsWith('PostgreSQL') ? '🐘' : r.target.startsWith('MySQL') ? '🐬' : '🍃';
+      if (r.status === 'SUCCESS') {
+        return `${icon} <b>${r.target}:</b> 🟢 ONLINE (<code>${r.responseTime} ms</code>)\n   • DB: <code>${r.database}</code>`;
       } else {
-        lines.push(`🐘 <b>PostgreSQL:</b> 🔴 OFFLINE\n   • Error: <i>${escapeHtml(pgRes.error)}</i>`);
+        return `${icon} <b>${r.target}:</b> 🔴 OFFLINE\n   • Error: <i>${escapeHtml(r.error)}</i>`;
       }
-    }
+    });
 
-    // MySQL
-    if (hasMy && myRes) {
-      totalCount++;
-      if (myRes.status === 'SUCCESS') {
-        successCount++;
-        lines.push(`🐬 <b>MySQL:</b> 🟢 ONLINE (<code>${myRes.responseTime} ms</code>)\n   • DB: <code>${myRes.database}</code>`);
-      } else {
-        lines.push(`🐬 <b>MySQL:</b> 🔴 OFFLINE\n   • Error: <i>${escapeHtml(myRes.error)}</i>`);
-      }
-    }
-
+    const successCount = allRuns.filter((r) => r.status === 'SUCCESS').length;
+    const totalCount = allRuns.length;
     const allGood = successCount === totalCount;
+
     const summaryText =
       `📊 <b>Multi-Database Status Overview</b>\n\n` +
       lines.join('\n\n') +
@@ -421,95 +343,30 @@ async function processTelegramMessage(db, message) {
 
   // --- ⚡ Instant Multi-Ping (Execute Keep-Alive Cycle) ---
   if (isMultiPing) {
-    const mongoStart = Date.now();
-    let mongoRes;
-    try {
-      await db.command({ ping: 1 });
-      mongoRes = { status: 'SUCCESS', responseTime: Date.now() - mongoStart, database: dbName };
+    const [mongoResults, pgResults, mysqlResults] = await Promise.all([
+      pingAllMongo(),
+      pingAllPostgres(),
+      pingAllMysql(),
+    ]);
+
+    const allRuns = [...mongoResults, ...pgResults, ...mysqlResults];
+    for (const res of allRuns) {
       await logsCol.insertOne({
         action: 'PING',
-        target: 'MongoDB',
-        status: 'SUCCESS',
-        database: dbName,
-        responseTime: mongoRes.responseTime,
-        source: 'TELEGRAM_BOT',
-        createdAt: new Date(),
-      });
-    } catch (e) {
-      mongoRes = { status: 'FAILED', responseTime: 0, error: e.message, database: dbName };
-      await logsCol.insertOne({
-        action: 'PING',
-        target: 'MongoDB',
-        status: 'FAILED',
-        database: dbName,
-        error: e.message,
+        target: res.target,
+        status: res.status,
+        database: res.database,
+        responseTime: res.responseTime,
+        error: res.error || null,
         source: 'TELEGRAM_BOT',
         createdAt: new Date(),
       });
     }
 
-    let pgRes = null;
-    if (hasPg) {
-      try {
-        pgRes = await pingPostgres();
-        await logsCol.insertOne({
-          action: 'PING',
-          target: 'PostgreSQL',
-          status: pgRes.status,
-          database: pgRes.database,
-          responseTime: pgRes.responseTime,
-          source: 'TELEGRAM_BOT',
-          createdAt: new Date(),
-        });
-      } catch (e) {
-        pgRes = { status: 'FAILED', responseTime: 0, error: e.message, database: process.env.postgresql_db || 'postgresql' };
-        await logsCol.insertOne({
-          action: 'PING',
-          target: 'PostgreSQL',
-          status: 'FAILED',
-          database: process.env.postgresql_db || 'postgresql',
-          error: e.message,
-          source: 'TELEGRAM_BOT',
-          createdAt: new Date(),
-        });
-      }
-    }
-
-    let myRes = null;
-    if (hasMy) {
-      try {
-        myRes = await pingMysql();
-        await logsCol.insertOne({
-          action: 'PING',
-          target: 'MySQL',
-          status: myRes.status,
-          database: myRes.database,
-          responseTime: myRes.responseTime,
-          source: 'TELEGRAM_BOT',
-          createdAt: new Date(),
-        });
-      } catch (e) {
-        myRes = { status: 'FAILED', responseTime: 0, error: e.message, database: process.env.mysql_db || 'mysql' };
-        await logsCol.insertOne({
-          action: 'PING',
-          target: 'MySQL',
-          status: 'FAILED',
-          database: process.env.mysql_db || 'mysql',
-          error: e.message,
-          source: 'TELEGRAM_BOT',
-          createdAt: new Date(),
-        });
-      }
-    }
-
-    const lines = [];
-    lines.push(`✅ <b>MongoDB Atlas:</b> <code>${mongoRes.database}</code> (<code>${mongoRes.responseTime} ms</code>)`);
-    if (hasPg && pgRes) {
-      lines.push(`✅ <b>PostgreSQL:</b> <code>${pgRes.database}</code> (<code>${pgRes.responseTime} ms</code>)`);
-    }
-    if (hasMy && myRes) {
-      lines.push(`✅ <b>MySQL:</b> <code>${myRes.database}</code> (<code>${myRes.responseTime} ms</code>)`);
-    }
+    const lines = allRuns.map((r) => {
+      const isOk = r.status === 'SUCCESS';
+      return `${isOk ? '✅' : '❌'} <b>${r.target}:</b> <code>${r.database}</code> (<code>${r.responseTime} ms</code>)`;
+    });
 
     const pingDoneText =
       `⚡ <b>Instant Multi-DB Keep-Alive Ping Executed!</b>\n\n` +

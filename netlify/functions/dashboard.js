@@ -1,6 +1,6 @@
-﻿const { connectToDatabase } = require('./lib/mongodb');
-const { isPostgresConfigured } = require('./lib/postgres');
-const { isMysqlConfigured } = require('./lib/mysql');
+const { connectToDatabase, getMongoConfigs } = require('./lib/mongodb');
+const { getPostgresConfigs } = require('./lib/postgres');
+const { getMysqlConfigs } = require('./lib/mysql');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 
 exports.handler = async (event, context) => {
@@ -25,10 +25,41 @@ exports.handler = async (event, context) => {
 
   const dbName = process.env.MONGO_DB_NAME || 'system_reset';
   const mainCollection = process.env.WEBADMIN_COLLECTION || 'sysreset';
-  const pgConfigured = isPostgresConfigured();
-  const pgDbName = process.env.postgresql_db || process.env.POSTGRESQL_DB || 'postgresql';
-  const mysqlConfigured = isMysqlConfigured();
-  const mysqlDbName = process.env.mysql_db || process.env.MYSQL_DB || 'mysql';
+
+  const mongoConfigs = getMongoConfigs();
+  const postgresConfigs = getPostgresConfigs();
+  const mysqlConfigs = getMysqlConfigs();
+
+  const allDatabases = [
+    ...mongoConfigs.map((c) => ({
+      type: 'MongoDB',
+      badge: 'Atlas',
+      index: c.index,
+      label: c.label,
+      name: c.dbName,
+      status: 'ONLINE',
+      connection: 'Connected',
+      isPrimary: c.isPrimary,
+    })),
+    ...postgresConfigs.map((c) => ({
+      type: 'PostgreSQL',
+      badge: 'Aiven',
+      index: c.index,
+      label: c.label,
+      name: c.dbName,
+      status: 'ONLINE',
+      connection: 'Connected',
+    })),
+    ...mysqlConfigs.map((c) => ({
+      type: 'MySQL',
+      badge: 'Aiven',
+      index: c.index,
+      label: c.label,
+      name: c.dbName,
+      status: 'ONLINE',
+      connection: 'Connected',
+    })),
+  ];
 
   try {
     const { db } = await connectToDatabase();
@@ -53,7 +84,7 @@ exports.handler = async (event, context) => {
       logsCol.countDocuments({ status: 'SUCCESS' }),
       logsCol.countDocuments({ status: 'FAILED' }),
       logsCol.findOne({}, { sort: { createdAt: -1 } }),
-      logsCol.find({}, { sort: { createdAt: -1 } }).limit(8).toArray(),
+      logsCol.find({}, { sort: { createdAt: -1 } }).limit(10).toArray(),
       logsCol.find({ status: 'SUCCESS' }, { sort: { createdAt: -1 } }).limit(20).toArray(),
     ]);
 
@@ -152,14 +183,10 @@ exports.handler = async (event, context) => {
       const targetLabel = log.target || 'MongoDB';
       const defaultMsg = log.status === 'SUCCESS' ? `${targetLabel} ping completed` : `${targetLabel} ping failed`;
 
-      let dbTargetName = dbName;
-      if (targetLabel === 'PostgreSQL') dbTargetName = pgDbName;
-      else if (targetLabel === 'MySQL') dbTargetName = mysqlDbName;
-
       return {
         id: log._id.toString(),
         target: targetLabel,
-        database: log.database || dbTargetName,
+        database: log.database || dbName,
         time: date.toLocaleTimeString('en-US', {
           hour12: true,
           hour: 'numeric',
@@ -182,18 +209,22 @@ exports.handler = async (event, context) => {
         name: dbName,
         collection: mainCollection,
         connection: 'Connected',
-        postgres: pgConfigured
+        allDatabases,
+        mongoList: mongoConfigs,
+        postgresList: postgresConfigs,
+        mysqlList: mysqlConfigs,
+        postgres: postgresConfigs.length > 0
           ? {
               configured: true,
-              name: pgDbName,
+              name: postgresConfigs[0].dbName,
               status: 'ONLINE',
               connection: 'Connected',
             }
           : { configured: false },
-        mysql: mysqlConfigured
+        mysql: mysqlConfigs.length > 0
           ? {
               configured: true,
-              name: mysqlDbName,
+              name: mysqlConfigs[0].dbName,
               status: 'ONLINE',
               connection: 'Connected',
             }

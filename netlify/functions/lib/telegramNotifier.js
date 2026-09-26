@@ -1,4 +1,4 @@
-﻿const { connectToDatabase } = require('./mongodb');
+const { connectToDatabase } = require('./mongodb');
 require('dotenv').config();
 
 const BOT_TOKEN = process.env.telegram_bot || process.env.TELEGRAM_BOT_TOKEN;
@@ -44,9 +44,9 @@ async function sendTelegramMessage(chatId, text, options = {}) {
   }
 }
 
-function getDatabaseIcon(target) {
-  if (target === 'PostgreSQL') return '🐘';
-  if (target === 'MySQL') return '🐬';
+function getDatabaseIcon(target = '') {
+  if (target.startsWith('PostgreSQL') || target.startsWith('Postgres')) return '🐘';
+  if (target.startsWith('MySQL')) return '🐬';
   return '🍃';
 }
 
@@ -67,7 +67,6 @@ async function notifyPingSuccess({
     const { db } = await connectToDatabase();
     const settings = await db.collection('settings').findOne({});
 
-    // If auto ping notifications are globally disabled in settings, skip
     if (settings && settings.telegramNotifyOnPing === false) {
       return;
     }
@@ -81,8 +80,6 @@ async function notifyPingSuccess({
     ]);
 
     const bannedSet = new Set(bannedUsers.map((b) => b.userId));
-
-    // Compile unique recipients
     const recipientChatIds = new Set();
 
     for (const u of allowedUsers) {
@@ -91,7 +88,6 @@ async function notifyPingSuccess({
       }
     }
 
-    // Include default chat ID from settings if configured and not banned
     if (settings?.telegramDefaultChatId && !bannedSet.has(settings.telegramDefaultChatId)) {
       recipientChatIds.add(String(settings.telegramDefaultChatId));
     }
@@ -111,7 +107,7 @@ async function notifyPingSuccess({
 
     if (Array.isArray(results) && results.length > 0) {
       const anyFailed = results.some((r) => r.status === 'FAILED');
-      const headerIcon = anyFailed ? '⚠️' : '🟢';
+      const headerIcon = anyFailed ? '⚠️' : '⚡';
       const headerTitle = anyFailed ? 'Keep-Alive Warning' : 'Keep-Alive Pulse Confirmed';
 
       const lines = results.map((r) => {
@@ -127,18 +123,18 @@ async function notifyPingSuccess({
         `${headerIcon} <b>${headerTitle}</b>\n\n` +
         lines.join('\n') +
         `\n\n📡 <b>Source:</b> <code>${source}</code>\n` +
-        `🕒 <b>Timestamp:</b> <code>${timeStr}</code>\n\n` +
-        `🛡️ <i>All scheduled databases pinged and active.</i>`;
+        `⏰ <b>Timestamp:</b> <code>${timeStr}</code>\n\n` +
+        `🚀 <i>All scheduled databases pinged and active.</i>`;
     } else {
       const dbIcon = getDatabaseIcon(target);
       notificationMessage =
-        `🟢 <b>${target} Keep-Alive Successful!</b>\n\n` +
+        `⚡ <b>${target} Keep-Alive Successful!</b>\n\n` +
         `${dbIcon} <b>Database:</b> <code>${dbName}</code>\n` +
-        `⚡ <b>Status:</b> <b>ONLINE &amp; HEALTHY</b>\n` +
+        `🟢 <b>Status:</b> <b>ONLINE & HEALTHY</b>\n` +
         `⏱ <b>Latency:</b> <code>${latencyMs} ms</code>\n` +
         `📡 <b>Source:</b> <code>${source}</code>\n` +
-        `🕒 <b>Timestamp:</b> <code>${timeStr}</code>\n\n` +
-        `🛡️ <i>Keep-alive pulse confirmed. Database active.</i>`;
+        `⏰ <b>Timestamp:</b> <code>${timeStr}</code>\n\n` +
+        `🚀 <i>Keep-alive pulse confirmed. Database active.</i>`;
     }
 
     for (const chatId of recipientChatIds) {
@@ -156,4 +152,5 @@ async function notifyPingSuccess({
 module.exports = {
   sendTelegramMessage,
   notifyPingSuccess,
+  getDatabaseIcon,
 };

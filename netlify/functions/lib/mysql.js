@@ -2,7 +2,8 @@ const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
 
-let cachedPool = null;
+// Pool cache per instance index (1..5)
+const cachedPools = new Map();
 
 function resolveCaCertificate() {
   const rootDir = path.resolve(__dirname, '../../../');
@@ -25,18 +26,12 @@ function resolveCaCertificate() {
       try {
         return fs.readFileSync(candidate, 'utf8');
       } catch (e) {
-        console.error(`Failed to read MySQL CA certificate from ${candidate}:`, e.message);
+        console.error('Failed to read MySQL CA certificate from ' + candidate + ':', e.message);
       }
     }
   }
 
   return undefined;
-}
-
-function isMysqlConfigured() {
-  require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), override: true });
-  const url = process.env.mysql_url || process.env.MYSQL_URL || process.env.MYSQL_URI;
-  return Boolean(url && url.trim());
 }
 
 function getSslConfig(isLocal) {
@@ -47,7 +42,6 @@ function getSslConfig(isLocal) {
   const ca = resolveCaCertificate();
   const rejectUnauthorizedEnv = process.env.MYSQL_SSL_REJECT_UNAUTHORIZED || process.env.DB_SSL_REJECT_UNAUTHORIZED;
 
-  // If CA is available or explicitly set to true, enable strict verification
   const rejectUnauthorized = ca ? true : (rejectUnauthorizedEnv === 'true');
 
   if (!rejectUnauthorized) {
@@ -57,17 +51,62 @@ function getSslConfig(isLocal) {
   return ca ? { rejectUnauthorized: true, ca } : { rejectUnauthorized };
 }
 
-function getMysqlPool() {
-  if (cachedPool) {
-    return cachedPool;
+/**
+ * Returns configuration objects for all configured MySQL instances (up to 5).
+ * Instance 1 defaults to mysql_url / MYSQL_URL / MYSQL_URI / mysql_url1.
+ * Instances 2..5 use mysql_url2..5 / MYSQL_URL2..5 / MYSQL_URI2..5.
+ */
+function getMysqlConfigs() {
+  require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), override: true });
+  const configs = [];
+
+  for (let i = 1; i <= 5; i++) {
+    const url = i === 1
+      ? (process.env.mysql_url || process.env.MYSQL_URL || process.env.MYSQL_URI || process.env.mysql_url1 || process.env.MYSQL_URL1 || process.env.MYSQL_URI1)
+      : (process.env['mysql_url' + i] || process.env['MYSQL_URL' + i] || process.env['MYSQL_URI' + i]);
+
+    if (url && url.trim()) {
+      const defaultDb = process.env.mysql_db || process.env.MYSQL_DB || 'mysql';
+      const dbName = i === 1
+        ? (process.env.mysql_db || process.env.MYSQL_DB || process.env.mysql_db1 || process.env.MYSQL_DB1 || defaultDb)
+        : (process.env['mysql_db' + i] || process.env['MYSQL_DB' + i] || defaultDb);
+
+      configs.push({
+        index: i,
+        id: 'mysql_' + i,
+        url: url.trim(),
+        dbName: (dbName || 'mysql').trim(),
+      });
+    }
   }
 
-  const rawUrl = process.env.mysql_url || process.env.MYSQL_URL || process.env.MYSQL_URI;
-  if (!rawUrl) {
-    throw new Error('mysql_url is missing in environment variables');
+  const hasMultiple = configs.length > 1;
+  return configs.map((c) => ({
+    ...c,
+    label: hasMultiple ? 'MySQL ' + c.index : 'MySQL',
+  }));
+}
+
+function isMysqlConfigured(index) {
+  const configs = getMysqlConfigs();
+  if (index === undefined || index === null || index === 'any') {
+    return configs.length > 0;
+  }
+  return configs.some((c) => c.index === index);
+}
+
+function getMysqlPool(index = 1) {
+  if (cachedPools.has(index)) {
+    return cachedPools.get(index);
   }
 
-  let connectionString = rawUrl.trim();
+  const configs = getMysqlConfigs();
+  const config = configs.find((c) => c.index === index);
+  if (!config) {
+    throw new Error('MySQL instance ' + index + ' is not configured in environment variables');
+  }
+
+  let connectionString = config.url.trim();
   const isLocal = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
 
   if (!isLocal) {
@@ -81,7 +120,7 @@ function getMysqlPool() {
     }
   }
 
-  cachedPool = mysql.createPool({
+  const pool = mysql.createPool({
     uri: connectionString,
     ssl: getSslConfig(isLocal),
     waitForConnections: true,
@@ -90,57 +129,83 @@ function getMysqlPool() {
     connectTimeout: 5000,
   });
 
-  return cachedPool;
+  cachedPools.set(index, pool);
+  return pool;
 }
 
 /**
- * Executes a lightweight ping query against MySQL and measures latency.
+ * Executes a lightweight ping query against a MySQL instance (default index 1).
  */
-async function pingMysql() {
-  if (!isMysqlConfigured()) {
+async function pingMysql(index = 1) {
+  const configs = getMysqlConfigs();
+  const config = configs.find((c) => c.index === index);
+
+  if (!config) {
     return {
+      index,
+      target: 'MySQL ' + index,
       configured: false,
       status: 'SKIPPED',
-      message: 'MySQL is not configured',
+      message: 'MySQL ' + index + ' is not configured',
     };
   }
 
-  const defaultDbName = process.env.mysql_db || process.env.MYSQL_DB || 'mysql';
   let pool;
   try {
-    pool = getMysqlPool();
+    pool = getMysqlPool(index);
   } catch (err) {
-    cachedPool = null;
+    cachedPools.delete(index);
     throw err;
   }
 
   const pingStart = Date.now();
-
   try {
-    // Use non-reserved alias ping_time (current_time is a reserved keyword in MySQL)
     const [rows] = await pool.query('SELECT NOW() AS ping_time, DATABASE() AS ping_db, 1 AS alive;');
     const responseTimeMs = Date.now() - pingStart;
 
     const row = rows && rows[0] ? rows[0] : {};
     return {
+      index: config.index,
+      target: config.label,
       configured: true,
       status: 'SUCCESS',
-      database: row.ping_db || defaultDbName,
+      database: row.ping_db || config.dbName,
       responseTime: responseTimeMs,
       timestamp: row.ping_time || new Date().toISOString(),
     };
   } catch (err) {
+    const responseTimeMs = Date.now() - pingStart;
     if (err.message && err.message.includes('certificate')) {
-      cachedPool = null;
+      cachedPools.delete(index);
     }
-    throw err;
+    return {
+      index: config.index,
+      target: config.label,
+      configured: true,
+      status: 'FAILED',
+      database: config.dbName,
+      responseTime: responseTimeMs,
+      error: err.message || 'MySQL ping error',
+      timestamp: new Date().toISOString(),
+    };
   }
 }
 
+/**
+ * Pings all configured MySQL instances in parallel.
+ */
+async function pingAllMysql() {
+  const configs = getMysqlConfigs();
+  if (configs.length === 0) return [];
+  return Promise.all(configs.map((c) => pingMysql(c.index)));
+}
+
 module.exports = {
+  getMysqlConfigs,
   isMysqlConfigured,
   getMysqlPool,
   pingMysql,
+  pingAllMysql,
   getSslConfig,
   resolveCaCertificate,
 };

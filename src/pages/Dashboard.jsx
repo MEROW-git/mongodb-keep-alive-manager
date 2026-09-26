@@ -46,12 +46,43 @@ export default function Dashboard({
   // State for filtering connections in the database fleet explorer
   const [engineFilter, setEngineFilter] = useState('ALL');
 
+  // Extract all configured database instances
+  const allDatabasesList = useMemo(() => {
+    if (Array.isArray(dbInfo.allDatabases) && dbInfo.allDatabases.length > 0) {
+      return dbInfo.allDatabases;
+    }
+    const list = [
+      { type: 'MongoDB', label: 'MongoDB', name: dbInfo.name || 'system_reset', badge: 'Atlas', isPrimary: true, status: 'ONLINE' },
+      dbInfo.postgres?.configured && { type: 'PostgreSQL', label: 'PostgreSQL', name: dbInfo.postgres.name, badge: 'Aiven', status: 'ONLINE' },
+      dbInfo.mysql?.configured && { type: 'MySQL', label: 'MySQL', name: dbInfo.mysql.name, badge: 'Aiven', status: 'ONLINE' },
+    ].filter(Boolean);
+    return list;
+  }, [dbInfo]);
+
+  const mongoCount = useMemo(() => allDatabasesList.filter((d) => d.type === 'MongoDB').length, [allDatabasesList]);
+  const pgCount = useMemo(() => allDatabasesList.filter((d) => d.type === 'PostgreSQL').length, [allDatabasesList]);
+  const mysqlCount = useMemo(() => allDatabasesList.filter((d) => d.type === 'MySQL').length, [allDatabasesList]);
+
+  // Filtered databases for display
+  const displayedDatabases = useMemo(() => {
+    if (engineFilter === 'ALL') return allDatabasesList;
+    return allDatabasesList.filter((d) => d.type === engineFilter);
+  }, [allDatabasesList, engineFilter]);
+
   // Ref & state for perfectly aligned 2-per-view Big Box carousel
   const fleetScrollRef = useRef(null);
   const [currentSlidePage, setCurrentSlidePage] = useState(1);
   const totalSlidePages = useMemo(() => {
     return Math.max(1, Math.ceil(displayedDatabases.length / 2));
   }, [displayedDatabases.length]);
+
+  // Reset slide position and page indicator when filter changes
+  useEffect(() => {
+    setCurrentSlidePage(1);
+    if (fleetScrollRef.current) {
+      fleetScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+    }
+  }, [engineFilter]);
 
   const handleFleetScroll = () => {
     if (!fleetScrollRef.current) return;
@@ -79,29 +110,6 @@ export default function Dashboard({
       behavior: 'smooth',
     });
   };
-
-  // Extract all configured database instances
-  const allDatabasesList = useMemo(() => {
-    if (Array.isArray(dbInfo.allDatabases) && dbInfo.allDatabases.length > 0) {
-      return dbInfo.allDatabases;
-    }
-    const list = [
-      { type: 'MongoDB', label: 'MongoDB', name: dbInfo.name || 'system_reset', badge: 'Atlas', isPrimary: true, status: 'ONLINE' },
-      dbInfo.postgres?.configured && { type: 'PostgreSQL', label: 'PostgreSQL', name: dbInfo.postgres.name, badge: 'Aiven', status: 'ONLINE' },
-      dbInfo.mysql?.configured && { type: 'MySQL', label: 'MySQL', name: dbInfo.mysql.name, badge: 'Aiven', status: 'ONLINE' },
-    ].filter(Boolean);
-    return list;
-  }, [dbInfo]);
-
-  const mongoCount = useMemo(() => allDatabasesList.filter((d) => d.type === 'MongoDB').length, [allDatabasesList]);
-  const pgCount = useMemo(() => allDatabasesList.filter((d) => d.type === 'PostgreSQL').length, [allDatabasesList]);
-  const mysqlCount = useMemo(() => allDatabasesList.filter((d) => d.type === 'MySQL').length, [allDatabasesList]);
-
-  // Filtered databases for display
-  const displayedDatabases = useMemo(() => {
-    if (engineFilter === 'ALL') return allDatabasesList;
-    return allDatabasesList.filter((d) => d.type === engineFilter);
-  }, [allDatabasesList, engineFilter]);
 
   const isMultiDb = allDatabasesList.length > 1;
 

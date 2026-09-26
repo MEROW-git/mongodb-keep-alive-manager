@@ -48,7 +48,12 @@ async function checkAndTriggerScheduledPing() {
     }
   } catch (err) {
     isPinging = false;
-    console.error('❌ [AUTONOMOUS SCHEDULER] Error during scheduled check:', err.message);
+    const isSslAlert = err.message && (err.message.includes('SSL alert number 80') || err.message.includes('tlsv1 alert internal error'));
+    if (isSslAlert) {
+      console.error('❌ [AUTONOMOUS SCHEDULER] MongoDB connection rejected (SSL alert 80): Lightsail IP is not whitelisted in MongoDB Atlas Network Access. Add your Lightsail IP or 0.0.0.0/0 in MongoDB Atlas.');
+    } else {
+      console.error('❌ [AUTONOMOUS SCHEDULER] Error during scheduled check:', err.message);
+    }
   }
 }
 

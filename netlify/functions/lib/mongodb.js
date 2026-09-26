@@ -86,9 +86,20 @@ async function connectToMongoInstance(index = 1, testLiveness = true) {
     maxIdleTimeMS: 30000,
     serverSelectionTimeoutMS: 5000,
     connectTimeoutMS: 5000,
+    family: 4, // Force IPv4 to prevent IPv6 TLS handshake drops on cloud VPS like AWS Lightsail
   });
 
-  await client.connect();
+  try {
+    await client.connect();
+  } catch (err) {
+    if (err.message && (err.message.includes('SSL alert number 80') || err.message.includes('tlsv1 alert internal error'))) {
+      console.error('\n🚨 [MONGODB ATLAS IP ACCESS RESTRICTION DETECTED]');
+      console.error('   MongoDB Atlas terminated the connection with TLS alert 80 (Internal Error).');
+      console.error('   Reason: Your current server IP address is NOT whitelisted in MongoDB Atlas Network Access.');
+      console.error('   Solution: Go to MongoDB Atlas -> Security -> Network Access -> Add IP Address -> Add your server IP (or 0.0.0.0/0).\n');
+    }
+    throw err;
+  }
   const db = client.db(config.dbName);
 
   cachedClients.set(index, client);

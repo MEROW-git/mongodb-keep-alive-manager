@@ -477,47 +477,43 @@ export default function Dashboard({
             const isDbOnline = db.status === 'ONLINE';
             const latencyNum = db.responseTimeNum || parseInt(db.responseTime) || (isMongo ? 95 : isPg ? 655 : 546);
 
-            // Signal strength tiers strictly driven by live ping latency (ms)
-            let signalBars = 5;
-            let signalStatus = 'EXCELLENT';
-            let signalColorClass = 'bg-mongo shadow-[0_0_6px_#00ED64]';
-            let signalTextColor = 'text-mongo';
+            // Realistic cloud ping latency tier calculations
+            let pingTierBadgeClass = '';
+            let pingTierLabel = '';
+            let pingTierIconColor = '';
 
             if (!isDbOnline) {
-              signalBars = 0;
-              signalStatus = 'OFFLINE';
-              signalColorClass = 'bg-red-500 shadow-[0_0_6px_#EF4444]';
-              signalTextColor = 'text-red-400';
+              pingTierBadgeClass = 'bg-red-500/10 text-red-400 border-red-500/30';
+              pingTierLabel = 'TIMEOUT';
+              pingTierIconColor = 'text-red-400';
             } else if (latencyNum <= 150) {
-              signalBars = 5;
-              signalStatus = 'EXCELLENT';
-              signalColorClass = 'bg-mongo shadow-[0_0_6px_#00ED64]';
-              signalTextColor = 'text-mongo';
-            } else if (latencyNum <= 600) {
-              signalBars = 4;
-              signalStatus = 'OPTIMAL';
-              signalColorClass = 'bg-teal-400 shadow-[0_0_6px_#2DD4BF]';
-              signalTextColor = 'text-teal-300';
-            } else if (latencyNum <= 1000) {
-              signalBars = 3;
-              signalStatus = 'GOOD';
-              signalColorClass = 'bg-sky-400 shadow-[0_0_6px_#38BDF8]';
-              signalTextColor = 'text-sky-300';
+              pingTierBadgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(0,237,100,0.12)]';
+              pingTierLabel = 'FAST';
+              pingTierIconColor = 'text-mongo';
+            } else if (latencyNum <= 450) {
+              pingTierBadgeClass = 'bg-teal-500/10 text-teal-300 border-teal-500/30 shadow-[0_0_10px_rgba(45,212,191,0.12)]';
+              pingTierLabel = 'NORMAL';
+              pingTierIconColor = 'text-teal-300';
+            } else if (latencyNum <= 800) {
+              pingTierBadgeClass = 'bg-sky-500/10 text-sky-300 border-sky-500/30 shadow-[0_0_10px_rgba(56,189,248,0.12)]';
+              pingTierLabel = 'CROSS-REGION';
+              pingTierIconColor = 'text-sky-300';
             } else {
-              signalBars = 2;
-              signalStatus = 'SLOW';
-              signalColorClass = 'bg-amber-400 shadow-[0_0_6px_#FBBF24]';
-              signalTextColor = 'text-amber-300';
+              pingTierBadgeClass = 'bg-amber-500/10 text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(251,191,36,0.12)]';
+              pingTierLabel = 'SLOW';
+              pingTierIconColor = 'text-amber-400';
             }
 
             const latencyPercent = Math.min(100, Math.max(15, 100 - (latencyNum / 1000) * 80));
 
-            const latencyTrackGradient = latencyNum <= 150
+            const latencyTrackGradient = !isDbOnline
+              ? 'from-red-500 to-red-400'
+              : latencyNum <= 150
               ? 'from-emerald-500 to-mongo shadow-[0_0_8px_rgba(0,237,100,0.5)]'
-              : latencyNum <= 600
+              : latencyNum <= 450
               ? 'from-teal-500 to-teal-300 shadow-[0_0_8px_rgba(45,212,191,0.5)]'
-              : latencyNum <= 1000
-              ? 'from-sky-500 to-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]'
+              : latencyNum <= 800
+              ? 'from-blue-500 to-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]'
               : 'from-amber-500 to-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]';
 
             return (
@@ -611,37 +607,29 @@ export default function Dashboard({
                       </div>
                     </div>
 
-                    {/* 5-Bar Signal Strength Meter */}
+                    {/* Real-time Ping Latency Heartbeat Badge */}
                     <div className="flex flex-col items-end gap-1">
-                      <div className="text-[9px] font-mono text-gray-400 uppercase tracking-widest">
-                        Signal
+                      <div className="text-[9px] font-mono text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                        <Activity className={`w-3 h-3 ${pingTierIconColor} animate-pulse`} />
+                        <span>Latency Heartbeat</span>
                       </div>
-                      <div className="flex items-end gap-1">
-                        {[1, 2, 3, 4, 5].map((bar) => (
-                          <div
-                            key={bar}
-                            className={`w-1 rounded-full transition-all duration-300 ${
-                              bar <= signalBars ? signalColorClass : 'bg-gray-800'
-                            }`}
-                            style={{ height: `${bar * 3.5 + 4}px` }}
-                          />
-                        ))}
-                        <span className={`text-[10px] font-mono font-bold ml-1.5 ${signalTextColor}`}>
-                          {signalStatus}
-                        </span>
+                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-mono text-xs font-bold ${pingTierBadgeClass}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isDbOnline ? 'bg-current animate-ping' : 'bg-red-500'}`} />
+                        <span>⚡ {latencyNum} ms</span>
+                        <span className="text-[10px] font-semibold opacity-80 uppercase tracking-tight">· {pingTierLabel}</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Footer Metrics: Latency, Operation & Speed Gauge */}
+                {/* Footer Metrics: Operation & Verification details */}
                 <div className="pt-2 border-t border-gray-800/80 flex flex-col gap-2.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="flex items-center gap-1.5 font-mono text-gray-400">
-                      <Zap className={`w-3.5 h-3.5 ${nameColor}`} />
-                      <span>Latency:</span>
-                      <span className={`font-extrabold font-mono px-2 py-0.5 rounded-lg bg-gray-900 border border-gray-800 ${nameColor}`}>
-                        {db.responseTime || `${latencyNum} ms`}
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Keep-Alive Check:</span>
+                      <span className="font-bold font-mono px-2 py-0.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200">
+                        {isDbOnline ? 'VERIFIED' : 'UNREACHABLE'}
                       </span>
                     </span>
 

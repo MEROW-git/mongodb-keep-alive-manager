@@ -21,6 +21,8 @@ import {
   Gauge,
   Sparkles,
   ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import StatusCard from '../components/StatusCard';
 import Chart from '../components/Chart';
@@ -43,6 +45,17 @@ export default function Dashboard({
 
   // State for filtering connections in the database fleet explorer
   const [engineFilter, setEngineFilter] = useState('ALL');
+
+  // Ref & function for horizontal smooth scrolling of big-box fleet
+  const fleetScrollRef = useRef(null);
+  const scrollFleet = (direction) => {
+    if (!fleetScrollRef.current) return;
+    const scrollAmount = 390; // Card width (370px) + gap (20px)
+    fleetScrollRef.current.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth',
+    });
+  };
 
   // Extract all configured database instances
   const allDatabasesList = useMemo(() => {
@@ -394,64 +407,86 @@ export default function Dashboard({
             </p>
           </div>
 
-          {/* Filter Pills with glowing active state */}
-          {allDatabasesList.length > 2 && (
-            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-900/90 border border-gray-800 shrink-0 shadow-inner overflow-x-auto">
-              <button
-                onClick={() => setEngineFilter('ALL')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition ${
-                  engineFilter === 'ALL'
-                    ? 'bg-gray-800 text-white shadow-md border border-gray-700'
-                    : 'text-gray-400 hover:text-gray-200'
-                }`}
-              >
-                All ({allDatabasesList.length})
-              </button>
-              {mongoCount > 0 && (
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {/* Filter Pills with glowing active state */}
+            {allDatabasesList.length > 2 && (
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-900/90 border border-gray-800 shrink-0 shadow-inner overflow-x-auto">
                 <button
-                  onClick={() => setEngineFilter('MongoDB')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition flex items-center gap-1.5 ${
-                    engineFilter === 'MongoDB'
-                      ? 'bg-mongo/20 text-mongo border border-mongo/40 shadow-[0_0_12px_rgba(0,237,100,0.15)] font-bold'
+                  onClick={() => setEngineFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition ${
+                    engineFilter === 'ALL'
+                      ? 'bg-gray-800 text-white shadow-md border border-gray-700'
                       : 'text-gray-400 hover:text-gray-200'
                   }`}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-mongo" />
-                  MongoDB ({mongoCount})
+                  All ({allDatabasesList.length})
                 </button>
-              )}
-              {pgCount > 0 && (
+                {mongoCount > 0 && (
+                  <button
+                    onClick={() => setEngineFilter('MongoDB')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition flex items-center gap-1.5 ${
+                      engineFilter === 'MongoDB'
+                        ? 'bg-mongo/20 text-mongo border border-mongo/40 shadow-[0_0_12px_rgba(0,237,100,0.15)] font-bold'
+                        : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-mongo" />
+                    MongoDB ({mongoCount})
+                  </button>
+                )}
+                {pgCount > 0 && (
+                  <button
+                    onClick={() => setEngineFilter('PostgreSQL')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition flex items-center gap-1.5 ${
+                      engineFilter === 'PostgreSQL'
+                        ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40 shadow-[0_0_12px_rgba(56,189,248,0.15)] font-bold'
+                        : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                    PostgreSQL ({pgCount})
+                  </button>
+                )}
+                {mysqlCount > 0 && (
+                  <button
+                    onClick={() => setEngineFilter('MySQL')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition flex items-center gap-1.5 ${
+                      engineFilter === 'MySQL'
+                        ? 'bg-amber-400/20 text-amber-400 border border-amber-400/40 shadow-[0_0_12px_rgba(251,191,36,0.15)] font-bold'
+                        : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    MySQL ({mysqlCount})
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Carousel Left / Right Scroll Controls */}
+            {displayedDatabases.length > 1 && (
+              <div className="flex items-center gap-1 bg-gray-900/90 border border-gray-800 p-1 rounded-xl shadow-inner shrink-0">
                 <button
-                  onClick={() => setEngineFilter('PostgreSQL')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition flex items-center gap-1.5 ${
-                    engineFilter === 'PostgreSQL'
-                      ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40 shadow-[0_0_12px_rgba(56,189,248,0.15)] font-bold'
-                      : 'text-gray-400 hover:text-gray-200'
-                  }`}
+                  onClick={() => scrollFleet('left')}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition active:scale-95"
+                  title="Scroll fleet left"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                  PostgreSQL ({pgCount})
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
-              )}
-              {mysqlCount > 0 && (
                 <button
-                  onClick={() => setEngineFilter('MySQL')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition flex items-center gap-1.5 ${
-                    engineFilter === 'MySQL'
-                      ? 'bg-amber-400/20 text-amber-400 border border-amber-400/40 shadow-[0_0_12px_rgba(251,191,36,0.15)] font-bold'
-                      : 'text-gray-400 hover:text-gray-200'
-                  }`}
+                  onClick={() => scrollFleet('right')}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition active:scale-95"
+                  title="Scroll fleet right"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                  MySQL ({mysqlCount})
+                  <ChevronRight className="w-4 h-4" />
                 </button>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Scalable Grid of Databases: FUTURISTIC NODE BLADES */}
-        <div className={`grid grid-cols-1 ${displayedDatabases.length === 4 ? 'md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-2 lg:grid-cols-3'} gap-5`}>
+        <div ref={fleetScrollRef} className="flex items-stretch gap-5 overflow-x-auto pb-4 pt-1 px-1 scroll-smooth snap-x snap-mandatory cyber-scroll-track">
           {displayedDatabases.map((db, idx) => {
             const isMongo = db.type === 'MongoDB';
             const isPg = db.type === 'PostgreSQL';
@@ -527,7 +562,7 @@ export default function Dashboard({
             return (
               <div
                 key={db.index ? `${db.type}_${db.index}` : idx}
-                className={`glass-panel rounded-2xl p-5 bg-cardBg/95 backdrop-blur-xl relative overflow-hidden flex flex-col justify-between gap-4.5 shadow-xl shadow-black/30 group ${cardCyberClass}`}
+                className={`glass-panel rounded-2xl p-5.5 bg-cardBg/95 backdrop-blur-xl relative overflow-hidden flex flex-col justify-between gap-4.5 shadow-xl shadow-black/30 group ${cardCyberClass} w-[340px] sm:w-[380px] shrink-0 snap-start`}
               >
                 {/* Subtle top glowing accent strip */}
                 <div

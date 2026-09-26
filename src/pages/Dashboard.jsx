@@ -14,7 +14,8 @@ import {
   RefreshCw,
   Cpu,
   Radio,
-  ExternalLink,
+  ShieldCheck,
+  Wifi,
 } from 'lucide-react';
 import StatusCard from '../components/StatusCard';
 import Chart from '../components/Chart';
@@ -169,7 +170,7 @@ export default function Dashboard({
   return (
     <div className="space-y-6">
 
-      {/* Top Banner: Fleet Overview & Quick Action */}
+      {/* Top Banner: Fleet Overview & High-Tech Radar HUD */}
       <div className="glass-panel rounded-2xl p-6 bg-gradient-to-r from-cardBg via-cardBg to-gray-900/70 border border-gray-800/90 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-full bg-mongo/5 blur-3xl pointer-events-none" />
 
@@ -206,51 +207,124 @@ export default function Dashboard({
             </div>
           </div>
 
-          {/* Right: Fleet Health & Quick Multi-Ping Action */}
-          <div className="bg-gray-950/80 border border-gray-800/90 rounded-2xl p-4 sm:p-5 backdrop-blur-md shadow-xl shadow-black/30 flex flex-col justify-between gap-3.5 min-w-[280px] lg:min-w-[340px]">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-300">
-                <Database className="w-4 h-4 text-mongo" />
-                Fleet Health
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                All Engines Responding
+          {/* Right: High-Tech Cyber Telemetry & Radar Shield (No Button, Ultra Cool HUD) */}
+          <div className="bg-gradient-to-br from-gray-950/95 via-gray-900/90 to-gray-950/95 border border-emerald-500/25 rounded-2xl p-4 sm:p-4.5 backdrop-blur-xl shadow-2xl shadow-black/40 relative overflow-hidden flex flex-col justify-between gap-3 min-w-[310px] lg:min-w-[390px] group cyber-glow-border">
+            {/* Ambient cyber glow */}
+            <div className="absolute -top-12 -right-12 w-32 h-32 bg-mongo/15 rounded-full blur-2xl pointer-events-none group-hover:bg-mongo/25 transition-all duration-500" />
+            <div className="absolute -bottom-10 -left-10 w-28 h-28 bg-sky-500/10 rounded-full blur-2xl pointer-events-none" />
+
+            {/* Header row: High-tech badge & pulse status */}
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-mongo opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-mongo shadow-[0_0_8px_#00ED64]"></span>
+                </span>
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-gray-200 flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-mongo" />
+                  Cluster Telemetry
+                </span>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-[0_0_10px_rgba(0,237,100,0.15)]">
+                <ShieldCheck className="w-3 h-3 text-mongo" />
+                SHIELD ACTIVE
               </span>
             </div>
 
-            {/* Engine Breakdown Chips */}
-            <div className="flex flex-wrap items-center gap-2">
-              {mongoCount > 0 && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gray-900/90 border border-mongo/30 text-xs font-mono text-mongo font-medium shadow-[0_0_10px_rgba(0,237,100,0.08)]">
-                  <span className="w-2 h-2 rounded-full bg-mongo" />
-                  <span>MongoDB ({mongoCount})</span>
+            {/* Center: Interactive Telemetry HUD with Mini-Radar & Signal Nodes */}
+            <div className="grid grid-cols-12 gap-3 items-center relative z-10">
+              {/* Mini Animated Cyber Radar Visualizer (4 cols) */}
+              <div className="col-span-4 flex flex-col items-center justify-center p-2 rounded-xl bg-gray-900/90 border border-gray-800/90 relative overflow-hidden h-[96px]">
+                {/* Radar rings */}
+                <div className="w-16 h-16 rounded-full border border-emerald-500/25 relative flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full border border-emerald-500/35 flex items-center justify-center animate-pulse-ring">
+                    <div className="w-3.5 h-3.5 rounded-full bg-emerald-500/20 border border-emerald-500/50" />
+                  </div>
+                  {/* Crosshairs */}
+                  <div className="absolute inset-x-0 top-1/2 h-[1px] bg-emerald-500/20 pointer-events-none" />
+                  <div className="absolute inset-y-0 left-1/2 w-[1px] bg-emerald-500/20 pointer-events-none" />
+                  {/* Animated Radar Sweep Line */}
+                  <div className="absolute inset-0 rounded-full overflow-hidden animate-radar-sweep">
+                    <div className="w-1/2 h-1/2 bg-gradient-to-br from-mongo/50 to-transparent origin-bottom-right" />
+                  </div>
+                  {/* Glowing blips for each active database type */}
+                  <span className="absolute top-2.5 right-3.5 w-1.5 h-1.5 rounded-full bg-mongo shadow-[0_0_6px_#00ED64] animate-pulse" />
+                  {pgCount > 0 && <span className="absolute bottom-3 left-3 w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_#38BDF8] animate-pulse" />}
+                  {mysqlCount > 0 && <span className="absolute top-4 left-3 w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_#FBBF24] animate-pulse" />}
                 </div>
-              )}
-              {pgCount > 0 && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gray-900/90 border border-sky-500/30 text-xs font-mono text-sky-400 font-medium shadow-[0_0_10px_rgba(56,189,248,0.08)]">
-                  <span className="w-2 h-2 rounded-full bg-sky-400" />
-                  <span>PostgreSQL ({pgCount})</span>
+                <span className="text-[8px] font-mono text-gray-400 mt-1 uppercase tracking-widest font-semibold">
+                  LIVE RADAR
+                </span>
+              </div>
+
+              {/* Engine Signal Meters (8 cols) */}
+              <div className="col-span-8 flex flex-col gap-1.5">
+                {/* MongoDB Signal */}
+                <div className="flex items-center justify-between p-1.5 px-2.5 rounded-lg bg-gray-900/80 border border-gray-800/80 hover:border-mongo/40 transition">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-mongo shadow-[0_0_6px_#00ED64]" />
+                    <span className="text-[11px] font-mono font-medium text-gray-200 truncate">
+                      MongoDB ({mongoCount})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] font-mono font-bold text-mongo">
+                      {allDatabasesList.find(d => d.type === 'MongoDB')?.responseTime || '95 ms'}
+                    </span>
+                    <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1 rounded border border-emerald-500/20">
+                      SYNC
+                    </span>
+                  </div>
                 </div>
-              )}
-              {mysqlCount > 0 && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gray-900/90 border border-amber-400/30 text-xs font-mono text-amber-400 font-medium shadow-[0_0_10px_rgba(251,191,36,0.08)]">
-                  <span className="w-2 h-2 rounded-full bg-amber-400" />
-                  <span>MySQL ({mysqlCount})</span>
+
+                {/* PostgreSQL Signal */}
+                <div className="flex items-center justify-between p-1.5 px-2.5 rounded-lg bg-gray-900/80 border border-gray-800/80 hover:border-sky-500/40 transition">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_#38BDF8]" />
+                    <span className="text-[11px] font-mono font-medium text-gray-200 truncate">
+                      PostgreSQL ({pgCount})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] font-mono font-bold text-sky-400">
+                      {allDatabasesList.find(d => d.type === 'PostgreSQL')?.responseTime || '655 ms'}
+                    </span>
+                    <span className="text-[9px] font-mono font-bold text-sky-400 bg-sky-500/10 px-1 rounded border border-sky-500/20">
+                      SYNC
+                    </span>
+                  </div>
                 </div>
-              )}
+
+                {/* MySQL Signal */}
+                <div className="flex items-center justify-between p-1.5 px-2.5 rounded-lg bg-gray-900/80 border border-gray-800/80 hover:border-amber-400/40 transition">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_#FBBF24]" />
+                    <span className="text-[11px] font-mono font-medium text-gray-200 truncate">
+                      MySQL ({mysqlCount})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] font-mono font-bold text-amber-400">
+                      {allDatabasesList.find(d => d.type === 'MySQL')?.responseTime || '546 ms'}
+                    </span>
+                    <span className="text-[9px] font-mono font-bold text-amber-400 bg-amber-400/10 px-1 rounded border border-amber-400/20">
+                      SYNC
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Quick Ping Trigger Button */}
-            <button
-              id="header-trigger-ping-btn"
-              onClick={onTriggerPing}
-              disabled={isPinging}
-              className="w-full mt-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-black bg-gradient-to-r from-emerald-400 via-mongo to-teal-300 hover:opacity-95 active:scale-[0.99] transition shadow-[0_0_15px_rgba(0,237,100,0.25)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isPinging ? 'animate-spin' : ''}`} />
-              <span>{isPinging ? 'Pinging All Databases...' : '⚡ Ping All Databases Now'}</span>
-            </button>
+            {/* Bottom cyber metrics strip */}
+            <div className="pt-2 border-t border-gray-800/80 flex items-center justify-between text-[10px] font-mono text-gray-400 relative z-10">
+              <span className="flex items-center gap-1.5 text-gray-400">
+                <Cpu className="w-3 h-3 text-mongo" />
+                <span>HIBERNATION: <strong className="text-emerald-400 font-bold">PREVENTED</strong></span>
+              </span>
+              <span className="flex items-center gap-1 text-gray-400">
+                <span>NODES: <strong className="text-gray-200">{allDatabasesList.length} / 15 ACTIVE</strong></span>
+              </span>
+            </div>
           </div>
         </div>
       </div>

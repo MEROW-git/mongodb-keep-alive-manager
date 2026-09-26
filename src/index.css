@@ -58,3 +58,37 @@ body {
 .status-indicator-offline {
   box-shadow: 0 0 10px #EF4444;
 }
+
+/* High-Tech Cyber Telemetry & Radar Animations */
+@keyframes radar-sweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-radar-sweep {
+  animation: radar-sweep 3.5s linear infinite;
+}
+
+@keyframes pulse-ring {
+  0%, 100% {
+    transform: scale(0.96);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 0.2;
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2.5s ease-in-out infinite;
+}
+
+.cyber-glow-border {
+  border: 1px solid rgba(0, 237, 100, 0.25);
+  box-shadow: 0 0 20px rgba(0, 237, 100, 0.08), inset 0 0 15px rgba(0, 237, 100, 0.04);
+}

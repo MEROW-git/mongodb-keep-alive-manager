@@ -368,9 +368,9 @@ export default function Dashboard({
 
       {/* SECTION: Connected Database Fleet (CYBER SERVER BLADES) */}
       <div className="space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 px-1">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 px-1">
           <div>
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-mongo/10 border border-mongo/30 flex items-center justify-center shrink-0">
                 <Database className="w-4 h-4 text-mongo" />
               </div>
@@ -378,17 +378,17 @@ export default function Dashboard({
                 Active Database Connections
               </h2>
               <span className="text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-gray-900 text-mongo border border-mongo/30 shadow-[0_0_10px_rgba(0,237,100,0.1)] whitespace-nowrap">
-                {allDatabasesList.length} Active Node{allDatabasesList.length !== 1 ? 's' : ''} / 15 Max Slots
+                {allDatabasesList.length} Active / 15 Max
               </span>
             </div>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 mt-1 pl-10.5">
               Real-time health, encryption, and keep-alive ping telemetry for each cloud cluster.
             </p>
           </div>
 
           {/* Filter Pills with glowing active state */}
           {allDatabasesList.length > 2 && (
-            <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-gray-900/90 border border-gray-800 shrink-0 shadow-inner">
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-900/90 border border-gray-800 shrink-0 shadow-inner overflow-x-auto">
               <button
                 onClick={() => setEngineFilter('ALL')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition ${
@@ -533,9 +533,9 @@ export default function Dashboard({
                 />
 
                 {/* Top Header: Node Identification, Logo & Live Beacon */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center border ${iconBg}`}>
+                <div className="flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${iconBg}`}>
                       {isMongo ? (
                         <Database className="w-5 h-5 text-mongo" />
                       ) : isPg ? (
@@ -544,32 +544,34 @@ export default function Dashboard({
                         <Zap className="w-5 h-5 text-amber-400" />
                       )}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-white text-sm tracking-tight">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
+                        <span className="font-extrabold text-white text-sm tracking-tight whitespace-nowrap">
                           {db.label}
                         </span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-gray-900 text-gray-300 border border-gray-700/80">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-900 text-gray-400 border border-gray-800 whitespace-nowrap">
                           {db.badge || (isMongo ? 'Atlas' : 'Aiven')}
                         </span>
                       </div>
-                      <div className="text-[11px] font-mono text-gray-400 mt-0.5 flex items-center gap-1.5">
-                        <span className="text-gray-500 uppercase">NODE {String(db.index || idx + 1).padStart(2, '0')}</span>
-                        <span>•</span>
-                        <span className={db.isPrimary ? 'text-amber-400 font-semibold' : 'text-gray-400'}>
-                          {db.isPrimary ? '★ Primary Storage' : 'Keep-Alive Target'}
-                        </span>
+                      <div className="text-[11px] font-mono text-gray-400 mt-0.5 flex items-center gap-1.5 whitespace-nowrap">
+                        <span className="text-gray-500 font-semibold uppercase whitespace-nowrap">NODE {String(db.index || idx + 1).padStart(2, '0')}</span>
+                        <span className="text-gray-600">•</span>
+                        {db.isPrimary ? (
+                          <span className="text-amber-400 font-semibold whitespace-nowrap">★ Primary</span>
+                        ) : (
+                          <span className="text-gray-400 font-medium whitespace-nowrap">Target</span>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   {/* Real-time Health Beacon (Emerald Green = Online, Red = Offline) */}
-                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-semibold shrink-0 shadow-sm ${
+                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-semibold shrink-0 shadow-sm whitespace-nowrap ${
                     isDbOnline
                       ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-[0_0_10px_rgba(0,237,100,0.12)]'
                       : 'bg-red-500/10 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.12)]'
                   }`}>
-                    <span className="relative flex h-2 w-2">
+                    <span className="relative flex h-2 w-2 shrink-0">
                       <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
                         isDbOnline ? 'bg-mongo' : 'bg-red-500'
                       }`}></span>
@@ -577,7 +579,7 @@ export default function Dashboard({
                         isDbOnline ? 'bg-mongo shadow-[0_0_8px_#00ED64]' : 'bg-red-500 shadow-[0_0_8px_#EF4444]'
                       }`}></span>
                     </span>
-                    {isDbOnline ? 'ONLINE' : 'OFFLINE'}
+                    <span>{isDbOnline ? 'ONLINE' : 'OFFLINE'}</span>
                   </div>
                 </div>
 

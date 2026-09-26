@@ -467,29 +467,58 @@ export default function Dashboard({
               ? 'text-sky-400'
               : 'text-amber-400';
 
-            const pulseColor = isMongo
-              ? 'bg-mongo shadow-[0_0_10px_#00ED64]'
-              : isPg
-              ? 'bg-sky-400 shadow-[0_0_10px_#38BDF8]'
-              : 'bg-amber-400 shadow-[0_0_10px_#FBBF24]';
-
             const protocolString = isMongo
               ? 'mongodb+srv://'
               : isPg
               ? 'postgresql://'
               : 'mysql://';
 
-            // Latency calculations for signal bars & progress meter
+            // Real live connection status & latency metrics from ping query
+            const isDbOnline = db.status === 'ONLINE';
             const latencyNum = db.responseTimeNum || parseInt(db.responseTime) || (isMongo ? 95 : isPg ? 655 : 546);
-            const signalBars = latencyNum <= 150 ? 5 : latencyNum <= 350 ? 4 : latencyNum <= 700 ? 3 : 2;
-            const signalStatus = latencyNum <= 150 ? 'EXCELLENT' : latencyNum <= 700 ? 'OPTIMAL' : 'STABLE';
+
+            // Signal strength tiers strictly driven by live ping latency (ms)
+            let signalBars = 5;
+            let signalStatus = 'EXCELLENT';
+            let signalColorClass = 'bg-mongo shadow-[0_0_6px_#00ED64]';
+            let signalTextColor = 'text-mongo';
+
+            if (!isDbOnline) {
+              signalBars = 0;
+              signalStatus = 'OFFLINE';
+              signalColorClass = 'bg-red-500 shadow-[0_0_6px_#EF4444]';
+              signalTextColor = 'text-red-400';
+            } else if (latencyNum <= 150) {
+              signalBars = 5;
+              signalStatus = 'EXCELLENT';
+              signalColorClass = 'bg-mongo shadow-[0_0_6px_#00ED64]';
+              signalTextColor = 'text-mongo';
+            } else if (latencyNum <= 600) {
+              signalBars = 4;
+              signalStatus = 'OPTIMAL';
+              signalColorClass = 'bg-teal-400 shadow-[0_0_6px_#2DD4BF]';
+              signalTextColor = 'text-teal-300';
+            } else if (latencyNum <= 1000) {
+              signalBars = 3;
+              signalStatus = 'GOOD';
+              signalColorClass = 'bg-sky-400 shadow-[0_0_6px_#38BDF8]';
+              signalTextColor = 'text-sky-300';
+            } else {
+              signalBars = 2;
+              signalStatus = 'SLOW';
+              signalColorClass = 'bg-amber-400 shadow-[0_0_6px_#FBBF24]';
+              signalTextColor = 'text-amber-300';
+            }
+
             const latencyPercent = Math.min(100, Math.max(15, 100 - (latencyNum / 1000) * 80));
 
-            const latencyTrackGradient = isMongo
+            const latencyTrackGradient = latencyNum <= 150
               ? 'from-emerald-500 to-mongo shadow-[0_0_8px_rgba(0,237,100,0.5)]'
-              : isPg
-              ? 'from-blue-500 to-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]'
-              : 'from-orange-500 to-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]';
+              : latencyNum <= 600
+              ? 'from-teal-500 to-teal-300 shadow-[0_0_8px_rgba(45,212,191,0.5)]'
+              : latencyNum <= 1000
+              ? 'from-sky-500 to-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]'
+              : 'from-amber-500 to-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]';
 
             return (
               <div
@@ -538,13 +567,21 @@ export default function Dashboard({
                     </div>
                   </div>
 
-                  {/* Pulsing Beacon Status */}
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 shrink-0 shadow-[0_0_10px_rgba(0,237,100,0.1)]">
+                  {/* Real-time Health Beacon (Emerald Green = Online, Red = Offline) */}
+                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-semibold shrink-0 shadow-sm ${
+                    isDbOnline
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-[0_0_10px_rgba(0,237,100,0.12)]'
+                      : 'bg-red-500/10 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.12)]'
+                  }`}>
                     <span className="relative flex h-2 w-2">
-                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${pulseColor} opacity-75`}></span>
-                      <span className={`relative inline-flex rounded-full h-2 w-2 ${pulseColor}`}></span>
+                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                        isDbOnline ? 'bg-mongo' : 'bg-red-500'
+                      }`}></span>
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                        isDbOnline ? 'bg-mongo shadow-[0_0_8px_#00ED64]' : 'bg-red-500 shadow-[0_0_8px_#EF4444]'
+                      }`}></span>
                     </span>
-                    ONLINE
+                    {isDbOnline ? 'ONLINE' : 'OFFLINE'}
                   </div>
                 </div>
 
@@ -584,18 +621,12 @@ export default function Dashboard({
                           <div
                             key={bar}
                             className={`w-1 rounded-full transition-all duration-300 ${
-                              bar <= signalBars
-                                ? isMongo
-                                  ? 'bg-mongo shadow-[0_0_6px_#00ED64]'
-                                  : isPg
-                                  ? 'bg-sky-400 shadow-[0_0_6px_#38BDF8]'
-                                  : 'bg-amber-400 shadow-[0_0_6px_#FBBF24]'
-                                : 'bg-gray-800'
+                              bar <= signalBars ? signalColorClass : 'bg-gray-800'
                             }`}
                             style={{ height: `${bar * 3.5 + 4}px` }}
                           />
                         ))}
-                        <span className={`text-[10px] font-mono font-bold ml-1.5 ${nameColor}`}>
+                        <span className={`text-[10px] font-mono font-bold ml-1.5 ${signalTextColor}`}>
                           {signalStatus}
                         </span>
                       </div>

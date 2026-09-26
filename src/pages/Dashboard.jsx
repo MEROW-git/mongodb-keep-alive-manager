@@ -368,27 +368,27 @@ export default function Dashboard({
 
       {/* SECTION: Connected Database Fleet (CYBER SERVER BLADES) */}
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 px-1">
           <div>
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-lg bg-mongo/10 border border-mongo/30 flex items-center justify-center">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-mongo/10 border border-mongo/30 flex items-center justify-center shrink-0">
                 <Database className="w-4 h-4 text-mongo" />
               </div>
-              <h2 className="text-lg font-extrabold text-white tracking-tight flex items-center gap-2.5">
-                <span>Active Database Connections</span>
-                <span className="text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-gray-900 text-mongo border border-mongo/30 shadow-[0_0_10px_rgba(0,237,100,0.1)]">
-                  {allDatabasesList.length} Active Node{allDatabasesList.length !== 1 ? 's' : ''} / 15 Max Slots
-                </span>
+              <h2 className="text-lg font-extrabold text-white tracking-tight whitespace-nowrap">
+                Active Database Connections
               </h2>
+              <span className="text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-gray-900 text-mongo border border-mongo/30 shadow-[0_0_10px_rgba(0,237,100,0.1)] whitespace-nowrap">
+                {allDatabasesList.length} Active Node{allDatabasesList.length !== 1 ? 's' : ''} / 15 Max Slots
+              </span>
             </div>
             <p className="text-xs text-gray-400 mt-1">
-              Real-time health, signal quality, encryption, and keep-alive ping telemetry for each cloud cluster.
+              Real-time health, encryption, and keep-alive ping telemetry for each cloud cluster.
             </p>
           </div>
 
           {/* Filter Pills with glowing active state */}
           {allDatabasesList.length > 2 && (
-            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-900/90 border border-gray-800 self-start sm:self-auto shadow-inner">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-gray-900/90 border border-gray-800 shrink-0 shadow-inner">
               <button
                 onClick={() => setEngineFilter('ALL')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition ${
@@ -582,62 +582,58 @@ export default function Dashboard({
                 </div>
 
                 {/* Center: High-Tech Database Terminal HUD */}
-                <div className="p-3.5 rounded-xl bg-gray-950/90 border border-gray-800/90 relative overflow-hidden group-hover:border-gray-700/90 transition shadow-inner">
+                <div className="p-3.5 rounded-xl bg-gray-950/90 border border-gray-800/90 relative overflow-hidden group-hover:border-gray-700/90 transition shadow-inner space-y-2.5">
                   {/* Top terminal bar with dots & protocol */}
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-800/70 text-[10px] font-mono text-gray-500">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-800/70 text-[10px] font-mono text-gray-500">
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-red-500/70" />
-                      <span className="w-2 h-2 rounded-full bg-yellow-500/70" />
-                      <span className="w-2 h-2 rounded-full bg-emerald-500/70" />
+                      <span className="w-2 h-2 rounded-full bg-red-500/80" />
+                      <span className="w-2 h-2 rounded-full bg-yellow-500/80" />
+                      <span className="w-2 h-2 rounded-full bg-emerald-500/80" />
                       <span className="ml-1 text-gray-400 font-semibold">{protocolString}</span>
                     </div>
-                    <span className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                    <span className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded text-[10px] font-mono border border-emerald-500/20 whitespace-nowrap">
                       <Lock className="w-2.5 h-2.5" />
                       TLS 1.3
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-[10px] font-mono uppercase tracking-wider text-gray-500">
-                        Target Database
-                      </div>
-                      <div className={`font-mono font-black text-base tracking-wide mt-0.5 ${nameColor} terminal-glow break-all`}>
-                        {db.name || 'system_reset'}
-                      </div>
+                  {/* Row 1: Target Database Name (Full row width, never line-breaks!) */}
+                  <div>
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-gray-500">
+                      Target Database
                     </div>
+                    <div className={`font-mono font-black text-base tracking-wide mt-0.5 ${nameColor} terminal-glow truncate`}>
+                      {db.name || 'system_reset'}
+                    </div>
+                  </div>
 
-                    {/* Real-time Ping Latency Heartbeat Badge */}
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="text-[9px] font-mono text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                        <Activity className={`w-3 h-3 ${pingTierIconColor} animate-pulse`} />
-                        <span>Latency Heartbeat</span>
-                      </div>
-                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-mono text-xs font-bold ${pingTierBadgeClass}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${isDbOnline ? 'bg-current animate-ping' : 'bg-red-500'}`} />
-                        <span>⚡ {latencyNum} ms</span>
-                        <span className="text-[10px] font-semibold opacity-80 uppercase tracking-tight">· {pingTierLabel}</span>
-                      </div>
+                  {/* Row 2: Heartbeat Latency Bar (Full row width, never wraps numbers!) */}
+                  <div className="pt-2 border-t border-gray-900 flex items-center justify-between">
+                    <span className="text-[11px] font-mono text-gray-400 flex items-center gap-1.5 whitespace-nowrap">
+                      <Activity className={`w-3.5 h-3.5 ${pingTierIconColor} animate-pulse shrink-0`} />
+                      <span>Ping Latency</span>
+                    </span>
+                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-mono text-xs font-bold whitespace-nowrap ${pingTierBadgeClass}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isDbOnline ? 'bg-current animate-ping' : 'bg-red-500'}`} />
+                      <span>⚡ {latencyNum} ms</span>
+                      <span className="text-[10px] font-semibold opacity-80 uppercase tracking-tight">· {pingTierLabel}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Footer Metrics: Operation & Verification details */}
-                <div className="pt-2 border-t border-gray-800/80 flex flex-col gap-2.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="flex items-center gap-1.5 font-mono text-gray-400">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Keep-Alive Check:</span>
-                      <span className="font-bold font-mono px-2 py-0.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200">
-                        {isDbOnline ? 'VERIFIED' : 'UNREACHABLE'}
-                      </span>
+                {/* Footer Metrics: Clean two-item layout with NO collision */}
+                <div className="pt-2 border-t border-gray-800/80 flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="flex items-center gap-1.5 text-emerald-400 font-semibold text-[11px] whitespace-nowrap">
+                      <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                      <span>Keep-Alive Verified</span>
                     </span>
 
-                    <span className="text-[11px] font-mono text-gray-300 flex items-center gap-1.5 bg-gray-900/90 px-2 py-0.5 rounded-lg border border-gray-800">
+                    <span className="text-[11px] text-gray-300 flex items-center gap-1 bg-gray-900/90 px-2 py-0.5 rounded-md border border-gray-800 whitespace-nowrap">
                       {isMongo ? (
-                        <span>Coll: <strong className="text-mongo">{dbInfo.collection || 'sysreset'}</strong></span>
+                        <span>Coll: <strong className="text-mongo font-mono">{dbInfo.collection || 'sysreset'}</strong></span>
                       ) : (
-                        <span>Query: <strong className={nameColor}>SELECT 1</strong></span>
+                        <span>Query: <strong className={`${nameColor} font-mono`}>SELECT 1</strong></span>
                       )}
                     </span>
                   </div>
@@ -663,13 +659,13 @@ export default function Dashboard({
         <div className="lg:col-span-5 glass-panel rounded-2xl p-5 sm:p-6 bg-cardBg/95 border border-gray-800/90 flex flex-col justify-between shadow-xl shadow-black/25">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-7 h-7 rounded-lg bg-mongo/10 border border-mongo/30 flex items-center justify-center">
+              <div className="flex items-center space-x-2.5 shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-mongo/10 border border-mongo/30 flex items-center justify-center shrink-0">
                   <Power className="w-3.5 h-3.5 text-mongo" />
                 </div>
-                <h3 className="text-sm font-bold text-white tracking-tight">Automation Status</h3>
+                <h3 className="text-sm font-bold text-white tracking-tight whitespace-nowrap">Automation Status</h3>
               </div>
-              <span className="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full bg-gray-900 text-gray-300 border border-gray-700 shadow-inner">
+              <span className="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full bg-gray-900 text-gray-300 border border-gray-700 shadow-inner whitespace-nowrap">
                 Daemonless Cron
               </span>
             </div>

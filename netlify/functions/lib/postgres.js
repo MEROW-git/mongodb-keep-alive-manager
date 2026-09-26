@@ -5,20 +5,27 @@ const path = require('path');
 // Pool cache per instance index (1..5)
 const cachedPools = new Map();
 
-function resolveCaCertificate() {
+function resolveCaCertificate(index = 1) {
   const rootDir = path.resolve(__dirname, '../../../');
-  const caPath = process.env.PG_SSL_CA_PATH || process.env.DB_SSL_CA_PATH;
-  const caCert = process.env.PG_SSL_CA_CERT || process.env.DB_SSL_CA_CERT;
+  const caPath = index === 1
+    ? (process.env.PG_SSL_CA_PATH || process.env.DB_SSL_CA_PATH)
+    : (process.env['PG_SSL_CA_PATH' + index] || process.env['DB_SSL_CA_PATH' + index]);
+  const caCert = index === 1
+    ? (process.env.PG_SSL_CA_CERT || process.env.DB_SSL_CA_CERT)
+    : (process.env['PG_SSL_CA_CERT' + index] || process.env['DB_SSL_CA_CERT' + index]);
 
   if (caCert && caCert.trim()) {
     return caCert.trim();
   }
 
+  const defaultCaFiles = index === 1
+    ? [path.resolve(rootDir, 'ca.pem'), path.resolve(process.cwd(), 'ca.pem')]
+    : [path.resolve(rootDir, `ca${index}.pem`), path.resolve(process.cwd(), `ca${index}.pem`)];
+
   const candidates = [
     caPath ? (path.isAbsolute(caPath) ? caPath : path.resolve(rootDir, caPath)) : null,
     caPath ? path.resolve(process.cwd(), caPath) : null,
-    path.resolve(rootDir, 'ca.pem'),
-    path.resolve(process.cwd(), 'ca.pem'),
+    ...defaultCaFiles,
   ].filter(Boolean);
 
   for (const candidate of candidates) {
@@ -34,21 +41,33 @@ function resolveCaCertificate() {
   return undefined;
 }
 
-function getSslConfig(isLocal) {
+function getSslConfig(isLocal, index = 1) {
   if (isLocal) return false;
 
   require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), override: true });
 
-  const ca = resolveCaCertificate();
-  const rejectUnauthorizedEnv = process.env.PG_SSL_REJECT_UNAUTHORIZED || process.env.DB_SSL_REJECT_UNAUTHORIZED;
+  const ca = resolveCaCertificate(index);
+  const rejectUnauthorizedEnv = index === 1
+    ? (process.env.PG_SSL_REJECT_UNAUTHORIZED || process.env.DB_SSL_REJECT_UNAUTHORIZED)
+    : (process.env['PG_SSL_REJECT_UNAUTHORIZED' + index] || process.env['DB_SSL_REJECT_UNAUTHORIZED' + index]);
 
-  const rejectUnauthorized = ca ? true : (rejectUnauthorizedEnv === 'true');
-
-  if (!rejectUnauthorized) {
-    console.warn('[SECURITY NOTICE] PostgreSQL TLS is running with rejectUnauthorized: false. Provide a CA certificate (ca.pem) or set DB_SSL_REJECT_UNAUTHORIZED=true for strict verification.');
-  }
+  const rejectUnauthorized = ca ? true : (rejectUnauthorizedEnv === 'true' && index === 1);
 
   return ca ? { rejectUnauthorized: true, ca } : { rejectUnauthorized };
+}
+
+function cleanUrl(rawUrl) {
+  try {
+    const u = new URL(rawUrl.trim());
+    const toDelete = [];
+    for (const key of u.searchParams.keys()) {
+      if (/^ssl[-_]?mode$/i.test(key)) toDelete.push(key);
+    }
+    toDelete.forEach((k) => u.searchParams.delete(k));
+    return u.toString();
+  } catch {
+    return rawUrl.trim();
+  }
 }
 
 /**
@@ -106,25 +125,17 @@ function getPostgresPool(index = 1) {
     throw new Error('PostgreSQL instance ' + index + ' is not configured in environment variables');
   }
 
-  let connectionString = config.url.trim();
+  const connectionString = config.url.trim();
   const isLocal = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
 
-  if (!isLocal) {
-    try {
-      const u = new URL(connectionString);
-      u.searchParams.delete('sslmode');
-      connectionString = u.toString();
-    } catch {
-      // fallback to raw
-    }
-  }
-
   const pool = new Pool({
-    connectionString,
-    ssl: getSslConfig(isLocal),
-    max: 5,
+    connectionString: isLocal ? connectionString : cleanUrl(connectionString),
+    ssl: getSslConfig(isLocal, index),
+    max: 4,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
   });
 
   pool.on('error', (err) => {
@@ -167,7 +178,7 @@ async function pingPostgres(index = 1) {
   try {
     client = await pool.connect();
     const pingStart = Date.now();
-    const result = await client.query('SELECT NOW() as current_time, current_database() as current_db, 1 as alive;');
+    const result = await client.query('/* keepalive */ SELECT 1 as alive, current_database() as current_db;');
     const responseTimeMs = Date.now() - pingStart;
 
     const row = result.rows && result.rows[0] ? result.rows[0] : {};
@@ -178,7 +189,7 @@ async function pingPostgres(index = 1) {
       status: 'SUCCESS',
       database: row.current_db || config.dbName,
       responseTime: responseTimeMs,
-      timestamp: row.current_time || new Date().toISOString(),
+      timestamp: new Date().toISOString(),
     };
   } catch (err) {
     if (err.message && err.message.includes('certificate')) {

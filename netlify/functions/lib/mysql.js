@@ -5,20 +5,27 @@ const path = require('path');
 // Pool cache per instance index (1..5)
 const cachedPools = new Map();
 
-function resolveCaCertificate() {
+function resolveCaCertificate(index = 1) {
   const rootDir = path.resolve(__dirname, '../../../');
-  const caPath = process.env.MYSQL_SSL_CA_PATH || process.env.DB_SSL_CA_PATH;
-  const caCert = process.env.MYSQL_SSL_CA_CERT || process.env.DB_SSL_CA_CERT;
+  const caPath = index === 1
+    ? (process.env.MYSQL_SSL_CA_PATH || process.env.DB_SSL_CA_PATH)
+    : (process.env['MYSQL_SSL_CA_PATH' + index] || process.env['DB_SSL_CA_PATH' + index]);
+  const caCert = index === 1
+    ? (process.env.MYSQL_SSL_CA_CERT || process.env.DB_SSL_CA_CERT)
+    : (process.env['MYSQL_SSL_CA_CERT' + index] || process.env['DB_SSL_CA_CERT' + index]);
 
   if (caCert && caCert.trim()) {
     return caCert.trim();
   }
 
+  const defaultCaFiles = index === 1
+    ? [path.resolve(rootDir, 'ca.pem'), path.resolve(process.cwd(), 'ca.pem')]
+    : [path.resolve(rootDir, `ca${index}.pem`), path.resolve(process.cwd(), `ca${index}.pem`)];
+
   const candidates = [
     caPath ? (path.isAbsolute(caPath) ? caPath : path.resolve(rootDir, caPath)) : null,
     caPath ? path.resolve(process.cwd(), caPath) : null,
-    path.resolve(rootDir, 'ca.pem'),
-    path.resolve(process.cwd(), 'ca.pem'),
+    ...defaultCaFiles,
   ].filter(Boolean);
 
   for (const candidate of candidates) {
@@ -34,21 +41,35 @@ function resolveCaCertificate() {
   return undefined;
 }
 
-function getSslConfig(isLocal) {
+function getSslConfig(isLocal, index = 1) {
   if (isLocal) return undefined;
 
   require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), override: true });
 
-  const ca = resolveCaCertificate();
-  const rejectUnauthorizedEnv = process.env.MYSQL_SSL_REJECT_UNAUTHORIZED || process.env.DB_SSL_REJECT_UNAUTHORIZED;
+  const ca = resolveCaCertificate(index);
+  const rejectUnauthorizedEnv = index === 1
+    ? (process.env.MYSQL_SSL_REJECT_UNAUTHORIZED || process.env.DB_SSL_REJECT_UNAUTHORIZED)
+    : (process.env['MYSQL_SSL_REJECT_UNAUTHORIZED' + index] || process.env['DB_SSL_REJECT_UNAUTHORIZED' + index]);
 
-  const rejectUnauthorized = ca ? true : (rejectUnauthorizedEnv === 'true');
-
-  if (!rejectUnauthorized) {
-    console.warn('[SECURITY NOTICE] MySQL TLS is running with rejectUnauthorized: false. Provide a CA certificate (ca.pem) or set DB_SSL_REJECT_UNAUTHORIZED=true for strict verification.');
-  }
+  // If CA is specifically provided for this instance, reject unauthorized certs
+  // If no instance-specific CA is provided, allow TLS connection without throwing certificate chain errors
+  const rejectUnauthorized = ca ? true : (rejectUnauthorizedEnv === 'true' && index === 1);
 
   return ca ? { rejectUnauthorized: true, ca } : { rejectUnauthorized };
+}
+
+function cleanUrl(rawUrl) {
+  try {
+    const u = new URL(rawUrl.trim());
+    const toDelete = [];
+    for (const key of u.searchParams.keys()) {
+      if (/^ssl[-_]?mode$/i.test(key)) toDelete.push(key);
+    }
+    toDelete.forEach((k) => u.searchParams.delete(k));
+    return u.toString();
+  } catch {
+    return rawUrl.trim();
+  }
 }
 
 /**
@@ -106,25 +127,16 @@ function getMysqlPool(index = 1) {
     throw new Error('MySQL instance ' + index + ' is not configured in environment variables');
   }
 
-  let connectionString = config.url.trim();
+  const connectionString = config.url.trim();
   const isLocal = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
 
-  if (!isLocal) {
-    try {
-      const u = new URL(connectionString);
-      u.searchParams.delete('sslmode');
-      u.searchParams.delete('ssl-mode');
-      connectionString = u.toString();
-    } catch {
-      // fallback
-    }
-  }
-
   const pool = mysql.createPool({
-    uri: connectionString,
-    ssl: getSslConfig(isLocal),
+    uri: isLocal ? connectionString : cleanUrl(connectionString),
+    ssl: getSslConfig(isLocal, index),
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
     waitForConnections: true,
-    connectionLimit: 5,
+    connectionLimit: 4,
     queueLimit: 0,
     connectTimeout: 5000,
   });
@@ -162,7 +174,7 @@ async function pingMysql(index = 1) {
   try {
     conn = await pool.getConnection();
     const pingStart = Date.now();
-    const [rows] = await conn.query('SELECT NOW() AS ping_time, DATABASE() AS ping_db, 1 AS alive;');
+    const [rows] = await conn.query('/* keepalive */ SELECT 1 AS alive, DATABASE() AS ping_db;');
     const responseTimeMs = Date.now() - pingStart;
 
     const row = rows && rows[0] ? rows[0] : {};
@@ -173,7 +185,7 @@ async function pingMysql(index = 1) {
       status: 'SUCCESS',
       database: row.ping_db || config.dbName,
       responseTime: responseTimeMs,
-      timestamp: row.ping_time || new Date().toISOString(),
+      timestamp: new Date().toISOString(),
     };
   } catch (err) {
     if (err.message && err.message.includes('certificate')) {

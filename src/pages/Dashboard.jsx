@@ -443,7 +443,7 @@ export default function Dashboard({
         </div>
 
         {/* Scalable Grid of Databases: FUTURISTIC NODE BLADES */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className={`grid grid-cols-1 ${displayedDatabases.length === 4 ? 'md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-2 lg:grid-cols-3'} gap-5`}>
           {displayedDatabases.map((db, idx) => {
             const isMongo = db.type === 'MongoDB';
             const isPg = db.type === 'PostgreSQL';
@@ -496,7 +496,7 @@ export default function Dashboard({
               pingTierIconColor = 'text-teal-300';
             } else if (latencyNum <= 800) {
               pingTierBadgeClass = 'bg-sky-500/10 text-sky-300 border-sky-500/30 shadow-[0_0_10px_rgba(56,189,248,0.12)]';
-              pingTierLabel = 'CROSS-REGION';
+              pingTierLabel = 'STABLE';
               pingTierIconColor = 'text-sky-300';
             } else {
               pingTierBadgeClass = 'bg-amber-500/10 text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(251,191,36,0.12)]';
@@ -623,20 +623,19 @@ export default function Dashboard({
                   </div>
                 </div>
 
-                {/* Footer Metrics: Clean two-item layout with NO collision */}
+                {/* Footer Metrics: High-tech compact telemetry pill with generous breathing room */}
                 <div className="pt-2 border-t border-gray-800/80 flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="flex items-center gap-1.5 text-emerald-400 font-semibold text-[11px] whitespace-nowrap">
-                      <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                      <span>Keep-Alive Verified</span>
+                      <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                      <span>Verified</span>
                     </span>
 
-                    <span className="text-[11px] text-gray-300 flex items-center gap-1 bg-gray-900/90 px-2 py-0.5 rounded-md border border-gray-800 whitespace-nowrap">
-                      {isMongo ? (
-                        <span>Coll: <strong className="text-mongo font-mono">{dbInfo.collection || 'sysreset'}</strong></span>
-                      ) : (
-                        <span>Query: <strong className={`${nameColor} font-mono`}>SELECT 1</strong></span>
-                      )}
+                    <span className="text-[11px] text-gray-300 flex items-center gap-1 bg-gray-900/90 px-2 py-0.5 rounded-md border border-gray-800 whitespace-nowrap shrink-0">
+                      <span className="text-gray-500 font-mono text-[10px]">{isMongo ? 'COLL:' : 'CHECK:'}</span>
+                      <strong className={`${nameColor} font-mono font-semibold`}>
+                        {isMongo ? (dbInfo.collection || 'sysreset') : 'SELECT 1'}
+                      </strong>
                     </span>
                   </div>
 
@@ -667,8 +666,9 @@ export default function Dashboard({
                 </div>
                 <h3 className="text-sm font-bold text-white tracking-tight whitespace-nowrap">Automation Status</h3>
               </div>
-              <span className="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full bg-gray-900 text-gray-300 border border-gray-700 shadow-inner whitespace-nowrap">
-                Daemonless Cron
+              <span className="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-inner whitespace-nowrap flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-mongo animate-pulse shrink-0" />
+                <span>Auto-Scheduler Active</span>
               </span>
             </div>
 

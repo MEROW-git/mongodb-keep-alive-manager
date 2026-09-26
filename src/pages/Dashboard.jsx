@@ -320,9 +320,17 @@ export default function Dashboard({
                 <Cpu className="w-3 h-3 text-mongo" />
                 <span>HIBERNATION: <strong className="text-emerald-400 font-bold">PREVENTED</strong></span>
               </span>
-              <span className="flex items-center gap-1 text-gray-400">
-                <span>NODES: <strong className="text-gray-200">{allDatabasesList.length} / 15 ACTIVE</strong></span>
-              </span>
+              <button
+                onClick={() => {
+                  const el = document.getElementById('active-databases-section');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="flex items-center gap-1 text-gray-400 hover:text-mongo transition cursor-pointer group/nodes"
+                title="Click to jump down to active database nodes"
+              >
+                <span>NODES: <strong className="text-gray-200 group-hover/nodes:text-mongo underline decoration-mongo/50 underline-offset-2">{allDatabasesList.length} / 15 ACTIVE</strong></span>
+                <ArrowUpRight className="w-3 h-3 text-mongo group-hover/nodes:translate-x-0.5 group-hover/nodes:-translate-y-0.5 transition-transform" />
+              </button>
             </div>
           </div>
         </div>
@@ -367,7 +375,7 @@ export default function Dashboard({
       </div>
 
       {/* SECTION: Connected Database Fleet (CYBER SERVER BLADES) */}
-      <div className="space-y-4">
+      <div id="active-databases-section" className="space-y-4 scroll-mt-20">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 px-1">
           <div>
             <div className="flex items-center gap-2.5">

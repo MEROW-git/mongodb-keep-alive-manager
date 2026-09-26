@@ -164,9 +164,9 @@ async function pingPostgres(index = 1) {
   }
 
   let client;
-  const pingStart = Date.now();
   try {
     client = await pool.connect();
+    const pingStart = Date.now();
     const result = await client.query('SELECT NOW() as current_time, current_database() as current_db, 1 as alive;');
     const responseTimeMs = Date.now() - pingStart;
 
@@ -181,7 +181,6 @@ async function pingPostgres(index = 1) {
       timestamp: row.current_time || new Date().toISOString(),
     };
   } catch (err) {
-    const responseTimeMs = Date.now() - pingStart;
     if (err.message && err.message.includes('certificate')) {
       cachedPools.delete(index);
     }
@@ -191,7 +190,7 @@ async function pingPostgres(index = 1) {
       configured: true,
       status: 'FAILED',
       database: config.dbName,
-      responseTime: responseTimeMs,
+      responseTime: 0,
       error: err.message || 'PostgreSQL ping error',
       timestamp: new Date().toISOString(),
     };

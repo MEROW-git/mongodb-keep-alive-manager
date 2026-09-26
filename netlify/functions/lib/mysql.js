@@ -158,9 +158,11 @@ async function pingMysql(index = 1) {
     throw err;
   }
 
-  const pingStart = Date.now();
+  let conn;
   try {
-    const [rows] = await pool.query('SELECT NOW() AS ping_time, DATABASE() AS ping_db, 1 AS alive;');
+    conn = await pool.getConnection();
+    const pingStart = Date.now();
+    const [rows] = await conn.query('SELECT NOW() AS ping_time, DATABASE() AS ping_db, 1 AS alive;');
     const responseTimeMs = Date.now() - pingStart;
 
     const row = rows && rows[0] ? rows[0] : {};
@@ -174,7 +176,6 @@ async function pingMysql(index = 1) {
       timestamp: row.ping_time || new Date().toISOString(),
     };
   } catch (err) {
-    const responseTimeMs = Date.now() - pingStart;
     if (err.message && err.message.includes('certificate')) {
       cachedPools.delete(index);
     }
@@ -184,10 +185,12 @@ async function pingMysql(index = 1) {
       configured: true,
       status: 'FAILED',
       database: config.dbName,
-      responseTime: responseTimeMs,
+      responseTime: 0,
       error: err.message || 'MySQL ping error',
       timestamp: new Date().toISOString(),
     };
+  } finally {
+    if (conn) conn.release();
   }
 }
 

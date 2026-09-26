@@ -55,7 +55,7 @@ function isMongoConfigured(index) {
  * Reusable MongoDB Connection for an instance index (1..5).
  * Defaults to primary instance (1).
  */
-async function connectToMongoInstance(index = 1) {
+async function connectToMongoInstance(index = 1, testLiveness = true) {
   const configs = getMongoConfigs();
   const config = configs.find((c) => c.index === index);
 
@@ -67,6 +67,9 @@ async function connectToMongoInstance(index = 1) {
   const cachedDb = cachedDbs.get(index);
 
   if (cachedClient && cachedDb) {
+    if (!testLiveness) {
+      return { client: cachedClient, db: cachedDb, config };
+    }
     try {
       await cachedDb.command({ ping: 1 });
       return { client: cachedClient, db: cachedDb, config };
@@ -99,12 +102,12 @@ async function connectToMongoInstance(index = 1) {
  * Backward compatible with existing connectToDatabase() calls.
  */
 async function connectToDatabase() {
-  const { client, db } = await connectToMongoInstance(1);
+  const { client, db } = await connectToMongoInstance(1, true);
   return { client, db };
 }
 
 /**
- * Pings a specific MongoDB instance and measures latency.
+ * Pings a specific MongoDB instance and measures pure round-trip command latency.
  */
 async function pingMongoInstance(index = 1) {
   const configs = getMongoConfigs();
@@ -120,10 +123,26 @@ async function pingMongoInstance(index = 1) {
     };
   }
 
+  let dbInstance;
+  try {
+    const res = await connectToMongoInstance(index, false);
+    dbInstance = res.db;
+  } catch (err) {
+    return {
+      index: config.index,
+      target: config.label,
+      configured: true,
+      status: 'FAILED',
+      database: config.dbName,
+      responseTime: 0,
+      error: err.message || 'Database connection error',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   const pingStart = Date.now();
   try {
-    const { db } = await connectToMongoInstance(index);
-    const pingResult = await db.command({ ping: 1 });
+    const pingResult = await dbInstance.command({ ping: 1 });
     const latency = Date.now() - pingStart;
 
     return {
@@ -139,6 +158,8 @@ async function pingMongoInstance(index = 1) {
   } catch (err) {
     const latency = Date.now() - pingStart;
     console.error('MongoDB [' + config.label + '] Ping operation failed:', err.message);
+    cachedClients.delete(index);
+    cachedDbs.delete(index);
     return {
       index: config.index,
       target: config.label,

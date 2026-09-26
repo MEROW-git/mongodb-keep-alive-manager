@@ -80,13 +80,39 @@ exports.handler = async (event, context) => {
       latestLog,
       recentLogs,
       recentPingsForChart,
+      latestLogsPerTarget,
     ] = await Promise.all([
       logsCol.countDocuments({ status: 'SUCCESS' }),
       logsCol.countDocuments({ status: 'FAILED' }),
       logsCol.findOne({}, { sort: { createdAt: -1 } }),
       logsCol.find({}, { sort: { createdAt: -1 } }).limit(10).toArray(),
       logsCol.find({ status: 'SUCCESS' }, { sort: { createdAt: -1 } }).limit(20).toArray(),
+      logsCol.aggregate([
+        { $sort: { createdAt: -1 } },
+        {
+          $group: {
+            _id: '$target',
+            latestLog: { $first: '$$ROOT' },
+          },
+        },
+      ]).toArray(),
     ]);
+
+    const targetLogMap = {};
+    for (const item of (latestLogsPerTarget || [])) {
+      if (item._id) targetLogMap[item._id] = item.latestLog;
+    }
+
+    const enrichedAllDatabases = allDatabases.map((d) => {
+      const log = targetLogMap[d.label] || targetLogMap[d.type];
+      return {
+        ...d,
+        responseTime: log ? `${log.responseTime || 0} ms` : null,
+        responseTimeNum: log ? log.responseTime : 0,
+        lastPing: log ? log.createdAt : null,
+        status: log ? (log.status === 'SUCCESS' ? 'ONLINE' : 'FAILED') : 'ONLINE',
+      };
+    });
 
     // Format last ping time
     let lastPingFormatted = 'Never';
@@ -209,7 +235,7 @@ exports.handler = async (event, context) => {
         name: dbName,
         collection: mainCollection,
         connection: 'Connected',
-        allDatabases,
+        allDatabases: enrichedAllDatabases,
         mongoList: mongoConfigs,
         postgresList: postgresConfigs,
         mysqlList: mysqlConfigs,

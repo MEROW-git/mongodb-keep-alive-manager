@@ -10,7 +10,8 @@
     "start": "node server.cjs",
     "seed": "node scripts/seed.cjs",
     "test:db": "node scripts/test_db.cjs",
-    "test:fn": "node scripts/test_functions.cjs"
+    "test:fn": "node scripts/test_functions.cjs",
+    "test:security": "node scripts/test_security.cjs"
   },
   "dependencies": {
     "@netlify/functions": "^2.8.2",

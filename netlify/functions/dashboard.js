@@ -3,6 +3,21 @@ const { getPostgresConfigs } = require('./lib/postgres');
 const { getMysqlConfigs } = require('./lib/mysql');
 const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 
+/**
+ * Convert an internal database configuration into browser-safe metadata.
+ * Keep this as an explicit allowlist so connection strings and future secret
+ * fields cannot cross the API response boundary by accident.
+ */
+function toPublicDatabaseConfig(config) {
+  return {
+    index: config.index,
+    id: config.id,
+    label: config.label,
+    dbName: config.dbName,
+    ...(typeof config.isPrimary === 'boolean' ? { isPrimary: config.isPrimary } : {}),
+  };
+}
+
 exports.handler = async (event, context) => {
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
@@ -236,9 +251,9 @@ exports.handler = async (event, context) => {
         collection: mainCollection,
         connection: 'Connected',
         allDatabases: enrichedAllDatabases,
-        mongoList: mongoConfigs,
-        postgresList: postgresConfigs,
-        mysqlList: mysqlConfigs,
+        mongoList: mongoConfigs.map(toPublicDatabaseConfig),
+        postgresList: postgresConfigs.map(toPublicDatabaseConfig),
+        mysqlList: mysqlConfigs.map(toPublicDatabaseConfig),
         postgres: postgresConfigs.length > 0
           ? {
               configured: true,
@@ -284,3 +299,5 @@ exports.handler = async (event, context) => {
     });
   }
 };
+
+exports.toPublicDatabaseConfig = toPublicDatabaseConfig;

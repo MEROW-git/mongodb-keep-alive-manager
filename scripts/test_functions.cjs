@@ -55,7 +55,12 @@ async function runTests() {
   console.log('Dashboard Status Code:', dashRes.statusCode);
   const dashData = JSON.parse(dashRes.body);
   console.log('DB Status:', dashData.databaseStatus);
-  console.log('Database Objects:', dashData.database);
+  console.log('Configured Databases:', (dashData.database?.allDatabases || []).map((db) => ({
+    type: db.type,
+    label: db.label,
+    name: db.name,
+    status: db.status,
+  })));
   console.log('Total Successful Pings:', dashData.stats?.totalSuccessfulPing);
   console.log('Response Time:', dashData.stats?.responseTime);
   console.log('Latency history points:', dashData.charts?.latencyHistory?.length);

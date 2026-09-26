@@ -46,13 +46,36 @@ export default function Dashboard({
   // State for filtering connections in the database fleet explorer
   const [engineFilter, setEngineFilter] = useState('ALL');
 
-  // Ref & function for horizontal smooth scrolling of big-box fleet
+  // Ref & state for perfectly aligned 2-per-view Big Box carousel
   const fleetScrollRef = useRef(null);
+  const [currentSlidePage, setCurrentSlidePage] = useState(1);
+  const totalSlidePages = useMemo(() => {
+    return Math.max(1, Math.ceil(displayedDatabases.length / 2));
+  }, [displayedDatabases.length]);
+
+  const handleFleetScroll = () => {
+    if (!fleetScrollRef.current) return;
+    const { scrollLeft, clientWidth } = fleetScrollRef.current;
+    if (clientWidth > 0) {
+      const page = Math.round(scrollLeft / clientWidth) + 1;
+      setCurrentSlidePage(Math.min(totalSlidePages, Math.max(1, page)));
+    }
+  };
+
   const scrollFleet = (direction) => {
     if (!fleetScrollRef.current) return;
-    const scrollAmount = 390; // Card width (370px) + gap (20px)
+    const containerWidth = fleetScrollRef.current.clientWidth;
     fleetScrollRef.current.scrollBy({
-      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      left: direction === 'left' ? -containerWidth : containerWidth,
+      behavior: 'smooth',
+    });
+  };
+
+  const scrollToSlide = (pageIndex) => {
+    if (!fleetScrollRef.current) return;
+    const containerWidth = fleetScrollRef.current.clientWidth;
+    fleetScrollRef.current.scrollTo({
+      left: pageIndex * containerWidth,
       behavior: 'smooth',
     });
   };
@@ -389,11 +412,11 @@ export default function Dashboard({
 
       {/* SECTION: Connected Database Fleet (CYBER SERVER BLADES) */}
       <div id="active-databases-section" className="space-y-4 scroll-mt-20">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 px-1">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-1">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-mongo/10 border border-mongo/30 flex items-center justify-center shrink-0">
-                <Database className="w-4 h-4 text-mongo" />
+              <div className="w-9 h-9 rounded-xl bg-mongo/10 border border-mongo/30 flex items-center justify-center shrink-0">
+                <Database className="w-4.5 h-4.5 text-mongo" />
               </div>
               <h2 className="text-lg font-extrabold text-white tracking-tight whitespace-nowrap">
                 Active Database Connections
@@ -402,15 +425,16 @@ export default function Dashboard({
                 {allDatabasesList.length} Active / 15 Max
               </span>
             </div>
-            <p className="text-xs text-gray-400 mt-1 pl-10.5">
+            <p className="text-xs text-gray-400 mt-1 pl-11">
               Real-time health, encryption, and keep-alive ping telemetry for each cloud cluster.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          {/* Grouped Controls: Filters + Carousel Navigator together! */}
+          <div className="flex items-center gap-2.5 self-start lg:self-auto shrink-0 flex-wrap">
             {/* Filter Pills with glowing active state */}
             {allDatabasesList.length > 2 && (
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-900/90 border border-gray-800 shrink-0 shadow-inner overflow-x-auto">
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-900/90 border border-gray-800 shadow-inner overflow-x-auto">
                 <button
                   onClick={() => setEngineFilter('ALL')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition ${
@@ -463,20 +487,23 @@ export default function Dashboard({
               </div>
             )}
 
-            {/* Carousel Left / Right Scroll Controls */}
-            {displayedDatabases.length > 1 && (
+            {/* Carousel Page Navigator right beside filters */}
+            {displayedDatabases.length > 2 && (
               <div className="flex items-center gap-1 bg-gray-900/90 border border-gray-800 p-1 rounded-xl shadow-inner shrink-0">
                 <button
                   onClick={() => scrollFleet('left')}
                   className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition active:scale-95"
-                  title="Scroll fleet left"
+                  title="Previous databases"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
+                <span className="text-xs font-mono font-bold text-gray-300 px-2 select-none whitespace-nowrap">
+                  {currentSlidePage} / {totalSlidePages}
+                </span>
                 <button
                   onClick={() => scrollFleet('right')}
                   className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition active:scale-95"
-                  title="Scroll fleet right"
+                  title="Next databases"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -485,8 +512,25 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* Scalable Grid of Databases: FUTURISTIC NODE BLADES */}
-        <div ref={fleetScrollRef} className="flex items-stretch gap-5 overflow-x-auto pb-4 pt-1 px-1 scroll-smooth snap-x snap-mandatory cyber-scroll-track">
+        {/* Carousel Container with Floating Side Arrows & Perfect 2-Per-View Alignment */}
+        <div className="relative group/fleet">
+          {/* Floating Left Arrow on Card Hover */}
+          {displayedDatabases.length > 2 && (
+            <button
+              onClick={() => scrollFleet('left')}
+              className="hidden md:flex absolute -left-3.5 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-gray-900/95 border border-gray-700/80 text-gray-300 hover:text-black hover:bg-mongo hover:border-mongo items-center justify-center shadow-xl transition-all opacity-0 group-hover/fleet:opacity-100 active:scale-90"
+              title="Scroll left"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Horizontal Scroll Track: EXACT 2-per-view Big Boxes (ZERO CUT-OFF!) */}
+          <div
+            ref={fleetScrollRef}
+            onScroll={handleFleetScroll}
+            className="flex items-stretch gap-6 overflow-x-auto pb-4 pt-1 px-1 scroll-smooth snap-x snap-mandatory cyber-scroll-track"
+          >
           {displayedDatabases.map((db, idx) => {
             const isMongo = db.type === 'MongoDB';
             const isPg = db.type === 'PostgreSQL';
@@ -562,7 +606,7 @@ export default function Dashboard({
             return (
               <div
                 key={db.index ? `${db.type}_${db.index}` : idx}
-                className={`glass-panel rounded-2xl p-5.5 bg-cardBg/95 backdrop-blur-xl relative overflow-hidden flex flex-col justify-between gap-4.5 shadow-xl shadow-black/30 group ${cardCyberClass} w-[340px] sm:w-[380px] shrink-0 snap-start`}
+                className={`glass-panel rounded-2xl p-6 bg-cardBg/95 backdrop-blur-xl relative overflow-hidden flex flex-col justify-between gap-5 shadow-xl shadow-black/30 group ${cardCyberClass} w-full md:w-[calc(50%-12px)] shrink-0 snap-start`}
               >
                 {/* Subtle top glowing accent strip */}
                 <div
@@ -693,6 +737,36 @@ export default function Dashboard({
               </div>
             );
           })}
+          </div>
+
+          {/* Floating Right Arrow on Card Hover */}
+          {displayedDatabases.length > 2 && (
+            <button
+              onClick={() => scrollFleet('right')}
+              className="hidden md:flex absolute -right-3.5 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-gray-900/95 border border-gray-700/80 text-gray-300 hover:text-black hover:bg-mongo hover:border-mongo items-center justify-center shadow-xl transition-all opacity-0 group-hover/fleet:opacity-100 active:scale-90"
+              title="Scroll right"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Carousel Slide Dots Indicator */}
+          {totalSlidePages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-1 pb-1">
+              {Array.from({ length: totalSlidePages }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => scrollToSlide(i)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    currentSlidePage === i + 1
+                      ? 'w-7 bg-mongo shadow-[0_0_8px_#00ED64]'
+                      : 'w-2 bg-gray-700 hover:bg-gray-500'
+                  }`}
+                  title={`Go to slide ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

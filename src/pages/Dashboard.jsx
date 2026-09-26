@@ -495,28 +495,7 @@ export default function Dashboard({
               </div>
             )}
 
-            {/* Carousel Page Navigator right beside filters */}
-            {displayedDatabases.length > 2 && (
-              <div className="flex items-center gap-1 bg-gray-900/90 border border-gray-800 p-1 rounded-xl shadow-inner shrink-0">
-                <button
-                  onClick={() => scrollFleet('left')}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition active:scale-95"
-                  title="Previous databases"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="text-xs font-mono font-bold text-gray-300 px-2 select-none whitespace-nowrap">
-                  {currentSlidePage} / {totalSlidePages}
-                </span>
-                <button
-                  onClick={() => scrollFleet('right')}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition active:scale-95"
-                  title="Next databases"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
+
           </div>
         </div>
 
@@ -537,7 +516,7 @@ export default function Dashboard({
           <div
             ref={fleetScrollRef}
             onScroll={handleFleetScroll}
-            className="flex items-stretch gap-6 overflow-x-auto pb-4 pt-1 px-1 scroll-smooth snap-x snap-mandatory cyber-scroll-track"
+            className="flex items-stretch gap-6 overflow-x-auto pb-2 pt-1 px-1 scroll-smooth snap-x snap-mandatory cyber-scroll-track"
           >
           {displayedDatabases.map((db, idx) => {
             const isMongo = db.type === 'MongoDB';
@@ -758,21 +737,45 @@ export default function Dashboard({
             </button>
           )}
 
-          {/* Carousel Slide Dots Indicator */}
+          {/* Unified Carousel Slide Controller (Centered Under Cards, No Clunky Scrollbar) */}
           {totalSlidePages > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-1 pb-1">
-              {Array.from({ length: totalSlidePages }).map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => scrollToSlide(i)}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    currentSlidePage === i + 1
-                      ? 'w-7 bg-mongo shadow-[0_0_8px_#00ED64]'
-                      : 'w-2 bg-gray-700 hover:bg-gray-500'
-                  }`}
-                  title={`Go to slide ${i + 1}`}
-                />
-              ))}
+            <div className="flex items-center justify-center gap-2.5 pt-3">
+              <button
+                onClick={() => scrollFleet('left')}
+                disabled={currentSlidePage === 1}
+                className="p-1.5 rounded-xl bg-gray-900/80 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 hover:bg-gray-800/80 disabled:opacity-20 disabled:cursor-not-allowed transition active:scale-95 shadow-sm"
+                title="Previous slide"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {/* Interactive Slide Indicator Pills */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-900/90 border border-gray-800 shadow-inner">
+                {Array.from({ length: totalSlidePages }).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => scrollToSlide(i)}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      currentSlidePage === i + 1
+                        ? 'w-8 bg-mongo shadow-[0_0_10px_#00ED64]'
+                        : 'w-2.5 bg-gray-700 hover:bg-gray-500'
+                    }`}
+                    title={`Slide ${i + 1} of ${totalSlidePages}`}
+                  />
+                ))}
+                <span className="text-[11px] font-mono font-bold text-gray-400 pl-1 select-none">
+                  {currentSlidePage}/{totalSlidePages}
+                </span>
+              </div>
+
+              <button
+                onClick={() => scrollFleet('right')}
+                disabled={currentSlidePage === totalSlidePages}
+                className="p-1.5 rounded-xl bg-gray-900/80 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 hover:bg-gray-800/80 disabled:opacity-20 disabled:cursor-not-allowed transition active:scale-95 shadow-sm"
+                title="Next slide"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           )}
         </div>

@@ -153,29 +153,14 @@ body {
   text-shadow: 0 0 12px currentColor;
 }
 
-/* Futuristic horizontal scroll track for Database Fleet */
+/* Clean hidden scroll track for Database Fleet (controlled by sleek green indicator & arrows) */
 .cyber-scroll-track {
-  scrollbar-width: thin;
-  scrollbar-color: #2D3748 #0B1120;
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE & Edge */
 }
 
 .cyber-scroll-track::-webkit-scrollbar {
-  height: 8px;
-}
-
-.cyber-scroll-track::-webkit-scrollbar-track {
-  background: #0B1120;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.cyber-scroll-track::-webkit-scrollbar-thumb {
-  background: #2D3748;
-  border-radius: 9999px;
-  border: 2px solid #0B1120;
-}
-
-.cyber-scroll-track::-webkit-scrollbar-thumb:hover {
-  background: #00ED64;
-  box-shadow: 0 0 12px rgba(0, 237, 100, 0.5);
+  display: none !important; /* Chrome, Safari, Opera */
+  width: 0 !important;
+  height: 0 !important;
 }

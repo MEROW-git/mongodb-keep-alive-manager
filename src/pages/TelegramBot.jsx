@@ -74,9 +74,14 @@ export default function TelegramBot() {
   const handleSyncUpdates = async () => {
     setIsSyncing(true);
     try {
-      await api.syncTelegramUpdates();
+      const result = await api.syncTelegramUpdates();
       await loadData(true);
-      showFeedback('Telegram updates synchronized! Detected users refreshed.', 'success');
+      showFeedback(
+        result.processed > 0
+          ? `Telegram connected. Processed ${result.processed} pending update${result.processed === 1 ? '' : 's'}.`
+          : 'Telegram connected. No pending updates—send /start to the bot, then sync again.',
+        'success',
+      );
     } catch (err) {
       showFeedback('Failed to sync updates: ' + err.message, 'error');
     } finally {

@@ -5,6 +5,9 @@ const { jsonResponse, verifyToken, CORS_HEADERS } = require('./lib/auth');
 require('dotenv').config();
 
 const BOT_TOKEN = process.env.telegram_bot || process.env.TELEGRAM_BOT_TOKEN;
+let botStatusCache = null;
+let botStatusCacheExpiresAt = 0;
+let telegramSyncInFlight = null;
 
 /**
  * Call Telegram Bot API helper
@@ -21,6 +24,105 @@ async function callTelegramApi(method, payload = {}) {
   });
 
   return response.json();
+}
+
+async function getTelegramBotStatus({ forceRefresh = false } = {}) {
+  if (!BOT_TOKEN) {
+    return {
+      configured: false,
+      connected: false,
+      info: null,
+      error: 'Telegram bot token is not configured',
+    };
+  }
+
+  const now = Date.now();
+  if (!forceRefresh && botStatusCache && now < botStatusCacheExpiresAt) {
+    return botStatusCache;
+  }
+
+  try {
+    const response = await callTelegramApi('getMe');
+    botStatusCache = {
+      configured: true,
+      connected: response.ok === true,
+      info: response.ok ? response.result : null,
+      error: response.ok ? null : (response.description || 'Telegram rejected the bot token'),
+    };
+  } catch (error) {
+    botStatusCache = {
+      configured: true,
+      connected: false,
+      info: null,
+      error: error.message || 'Unable to reach Telegram',
+    };
+  }
+
+  botStatusCacheExpiresAt = now + 30_000;
+  return botStatusCache;
+}
+
+function formatTelegramAdminState({ settings, users, bans, recentMessages, bot }) {
+  const bannedIds = new Set(bans.map((entry) => String(entry.userId)));
+
+  const formattedUsers = users.map((user) => ({
+    id: user._id?.toString() || String(user.userId),
+    userId: String(user.userId),
+    chatId: String(user.chatId || user.userId),
+    username: user.username || '',
+    displayName: user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || `User ${user.userId}`,
+    lastMessage: user.lastMessage || '',
+    lastActive: user.lastActive ? new Date(user.lastActive).toLocaleString('en-US') : 'N/A',
+    firstSeen: user.firstSeen ? new Date(user.firstSeen).toLocaleString('en-US') : 'N/A',
+    isAllowed: user.isAllowed === true,
+    receiveNotifications: user.receiveNotifications !== false,
+    isBanned: bannedIds.has(String(user.userId)),
+  }));
+
+  const formattedBans = bans.map((entry) => ({
+    id: entry._id?.toString() || String(entry.userId),
+    userId: String(entry.userId),
+    username: entry.username || 'Unknown',
+    reason: entry.reason || 'No reason specified',
+    bannedAt: entry.bannedAt ? new Date(entry.bannedAt).toLocaleString('en-US') : 'N/A',
+    bannedBy: entry.bannedBy || 'admin',
+  }));
+
+  const formattedMessages = recentMessages.map((entry) => ({
+    id: entry._id?.toString() || `${entry.userId}-${entry.createdAt || ''}`,
+    userId: String(entry.userId || ''),
+    chatId: String(entry.chatId || entry.userId || ''),
+    username: entry.username || '',
+    displayName: entry.displayName || entry.username || `User ${entry.userId}`,
+    text: entry.text || '',
+    isCommand: entry.isCommand === true,
+    time: entry.createdAt ? new Date(entry.createdAt).toLocaleTimeString('en-US') : 'N/A',
+    date: entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-US') : 'N/A',
+  }));
+
+  const response = {
+    status: 'success',
+    bot,
+    settings: {
+      defaultChatId: settings?.telegramDefaultChatId || '',
+      notifyOnPing: settings?.telegramNotifyOnPing !== false,
+      notifyOnFailure: settings?.telegramNotifyOnFailure !== false,
+    },
+    detectedUsers: formattedUsers,
+    recentMessages: formattedMessages,
+    bannedUsers: formattedBans,
+  };
+
+  // Preserve the existing flat fields for any older API consumers.
+  return {
+    ...response,
+    configured: bot.configured,
+    botUsername: bot.info?.username || process.env.TELEGRAM_BOT_USERNAME || 'KeepAliveBot',
+    defaultChatId: response.settings.defaultChatId,
+    notifyOnPing: response.settings.notifyOnPing,
+    users: formattedUsers,
+    bans: formattedBans,
+  };
 }
 
 /**
@@ -395,12 +497,21 @@ async function processTelegramMessage(db, message) {
 /**
  * Synchronize and process pending Telegram updates
  */
-async function syncTelegramUpdates(db) {
-  if (!BOT_TOKEN) return { processed: 0 };
+async function performTelegramUpdateSync(db) {
+  if (!BOT_TOKEN) {
+    return { ok: false, error: 'Telegram bot token is not configured', processed: 0 };
+  }
   try {
     const updatesRes = await callTelegramApi('getUpdates', { limit: 100, timeout: 0 });
-    if (!updatesRes.ok || !Array.isArray(updatesRes.result) || updatesRes.result.length === 0) {
-      return { processed: 0 };
+    if (!updatesRes.ok) {
+      return {
+        ok: false,
+        error: updatesRes.description || 'Telegram rejected the update request',
+        processed: 0,
+      };
+    }
+    if (!Array.isArray(updatesRes.result) || updatesRes.result.length === 0) {
+      return { ok: true, processed: 0 };
     }
 
     const updates = updatesRes.result;
@@ -425,10 +536,23 @@ async function syncTelegramUpdates(db) {
       await callTelegramApi('getUpdates', { offset: maxUpdateId + 1, limit: 1, timeout: 0 });
     }
 
-    return { processed: updates.length };
+    return { ok: true, processed: updates.length };
   } catch (err) {
     console.error('Telegram updates sync error:', err.message);
-    return { error: err.message, processed: 0 };
+    return { ok: false, error: err.message, processed: 0 };
+  }
+}
+
+async function syncTelegramUpdates(db) {
+  if (telegramSyncInFlight) {
+    return telegramSyncInFlight;
+  }
+
+  telegramSyncInFlight = performTelegramUpdateSync(db);
+  try {
+    return await telegramSyncInFlight;
+  } finally {
+    telegramSyncInFlight = null;
   }
 }
 
@@ -437,6 +561,8 @@ exports.sendSafeTelegramMessage = sendSafeTelegramMessage;
 exports.processTelegramMessage = processTelegramMessage;
 exports.syncTelegramUpdates = syncTelegramUpdates;
 exports.getAuthorizedKeyboard = getAuthorizedKeyboard;
+exports.getTelegramBotStatus = getTelegramBotStatus;
+exports.formatTelegramAdminState = formatTelegramAdminState;
 
 exports.handler = async (event, context) => {
   // Handle CORS preflight
@@ -506,28 +632,21 @@ exports.handler = async (event, context) => {
 
     // GET /api/telegram -> retrieve telegram management state
     if (event.httpMethod === 'GET') {
-      const [settings, users, bans, recentMessages] = await Promise.all([
+      const [settings, users, bans, recentMessages, bot] = await Promise.all([
         settingsCol.findOne({}),
         usersCol.find({}).sort({ lastActive: -1 }).limit(100).toArray(),
         bansCol.find({}).sort({ bannedAt: -1 }).toArray(),
         messagesCol.find({}).sort({ createdAt: -1 }).limit(50).toArray(),
+        getTelegramBotStatus(),
       ]);
 
-      const bannedIds = new Set(bans.map((b) => b.userId));
-      const formattedUsers = users.map((u) => ({
-        ...u,
-        isBanned: bannedIds.has(u.userId),
-      }));
-
-      return jsonResponse(200, {
-        configured: Boolean(BOT_TOKEN),
-        botUsername: process.env.TELEGRAM_BOT_USERNAME || 'KeepAliveBot',
-        defaultChatId: settings?.telegramDefaultChatId || '',
-        notifyOnPing: settings?.telegramNotifyOnPing !== false,
-        users: formattedUsers,
+      return jsonResponse(200, formatTelegramAdminState({
+        settings,
+        users,
         bans,
         recentMessages,
-      });
+        bot,
+      }));
     }
 
     // POST /api/telegram -> Admin actions
@@ -537,6 +656,16 @@ exports.handler = async (event, context) => {
 
       if (action === 'sync_updates') {
         const syncRes = await syncTelegramUpdates(db);
+        if (!syncRes.ok) {
+          const isPollingConflict = syncRes.error?.startsWith('Conflict:');
+          return jsonResponse(isPollingConflict ? 409 : 502, {
+            status: 'error',
+            message: isPollingConflict
+              ? 'Another Telegram update poll is already running. Please retry in a moment.'
+              : (syncRes.error || 'Telegram update synchronization failed'),
+            processed: syncRes.processed,
+          });
+        }
         return jsonResponse(200, { status: 'ok', ...syncRes });
       }
 

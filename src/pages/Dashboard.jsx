@@ -413,31 +413,35 @@ export default function Dashboard({
       {/* SECTION: Connected Database Fleet (CYBER SERVER BLADES) */}
       <div id="active-databases-section" className="space-y-4 scroll-mt-20">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-1">
-          <div>
-            <div className="flex items-center gap-2.5">
+          <div className="min-w-0">
+            <div className="flex items-start gap-2.5">
               <div className="w-9 h-9 rounded-xl bg-mongo/10 border border-mongo/30 flex items-center justify-center shrink-0">
                 <Database className="w-4.5 h-4.5 text-mongo" />
               </div>
-              <h2 className="text-lg font-extrabold text-white tracking-tight whitespace-nowrap">
-                Active Database Connections
-              </h2>
-              <span className="text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-gray-900 text-mongo border border-mongo/30 shadow-[0_0_10px_rgba(0,237,100,0.1)] whitespace-nowrap">
-                {allDatabasesList.length} Active / 15 Max
-              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-extrabold text-white tracking-tight leading-tight">
+                    Active Database Connections
+                  </h2>
+                  <span className="self-start text-[11px] sm:text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-gray-900 text-mongo border border-mongo/30 shadow-[0_0_10px_rgba(0,237,100,0.1)] whitespace-nowrap">
+                    {allDatabasesList.length} Active / 15 Max
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                  Real-time health, encryption, and keep-alive ping telemetry for each cloud cluster.
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-gray-400 mt-1 pl-11">
-              Real-time health, encryption, and keep-alive ping telemetry for each cloud cluster.
-            </p>
           </div>
 
           {/* Grouped Controls: Filters + Carousel Navigator together! */}
-          <div className="flex items-center gap-2.5 self-start lg:self-auto shrink-0 flex-wrap">
+          <div className="flex items-center gap-2.5 self-start lg:self-auto w-full lg:w-auto lg:shrink-0 flex-wrap">
             {/* Filter Pills with glowing active state */}
             {allDatabasesList.length > 2 && (
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-900/90 border border-gray-800 shadow-inner overflow-x-auto">
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 p-1 rounded-xl bg-gray-900/90 border border-gray-800 shadow-inner w-full lg:w-auto">
                 <button
                   onClick={() => setEngineFilter('ALL')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition ${
+                  className={`flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-mono font-medium whitespace-nowrap transition ${
                     engineFilter === 'ALL'
                       ? 'bg-gray-800 text-white shadow-md border border-gray-700'
                       : 'text-gray-400 hover:text-gray-200'
@@ -448,7 +452,7 @@ export default function Dashboard({
                 {mongoCount > 0 && (
                   <button
                     onClick={() => setEngineFilter('MongoDB')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium whitespace-nowrap transition flex items-center justify-center gap-1.5 ${
                       engineFilter === 'MongoDB'
                         ? 'bg-mongo/20 text-mongo border border-mongo/40 shadow-[0_0_12px_rgba(0,237,100,0.15)] font-bold'
                         : 'text-gray-400 hover:text-gray-200'
@@ -461,7 +465,7 @@ export default function Dashboard({
                 {pgCount > 0 && (
                   <button
                     onClick={() => setEngineFilter('PostgreSQL')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium whitespace-nowrap transition flex items-center justify-center gap-1.5 ${
                       engineFilter === 'PostgreSQL'
                         ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40 shadow-[0_0_12px_rgba(56,189,248,0.15)] font-bold'
                         : 'text-gray-400 hover:text-gray-200'
@@ -474,7 +478,7 @@ export default function Dashboard({
                 {mysqlCount > 0 && (
                   <button
                     onClick={() => setEngineFilter('MySQL')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium whitespace-nowrap transition flex items-center justify-center gap-1.5 ${
                       engineFilter === 'MySQL'
                         ? 'bg-amber-400/20 text-amber-400 border border-amber-400/40 shadow-[0_0_12px_rgba(251,191,36,0.15)] font-bold'
                         : 'text-gray-400 hover:text-gray-200'

@@ -5,6 +5,29 @@ const path = require('path');
 // Pool cache per instance index (1..5)
 const cachedPools = new Map();
 
+/**
+ * Persist one bounded heartbeat row in the target database. The upsert keeps
+ * the table at one row while still producing real write activity.
+ */
+async function writeMysqlHeartbeat(connection) {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS keepalive_heartbeat (
+      id TINYINT UNSIGNED NOT NULL,
+      last_heartbeat_at TIMESTAMP(3) NOT NULL,
+      service VARCHAR(64) NOT NULL,
+      PRIMARY KEY (id)
+    ) ENGINE=InnoDB;
+  `);
+
+  await connection.query(`
+    INSERT INTO keepalive_heartbeat (id, last_heartbeat_at, service)
+    VALUES (1, CURRENT_TIMESTAMP(3), 'mongodb-keep-alive-manager')
+    ON DUPLICATE KEY UPDATE
+      last_heartbeat_at = CURRENT_TIMESTAMP(3),
+      service = 'mongodb-keep-alive-manager';
+  `);
+}
+
 function resolveCaCertificate(index = 1) {
   const rootDir = path.resolve(__dirname, '../../../');
   const caPath = index === 1
@@ -146,7 +169,7 @@ function getMysqlPool(index = 1) {
 }
 
 /**
- * Executes a lightweight ping query against a MySQL instance (default index 1).
+ * Writes a heartbeat to a MySQL instance (default index 1).
  */
 async function pingMysql(index = 1) {
   const configs = getMysqlConfigs();
@@ -174,17 +197,17 @@ async function pingMysql(index = 1) {
   try {
     conn = await pool.getConnection();
     const pingStart = Date.now();
-    const [rows] = await conn.query('/* keepalive */ SELECT 1 AS alive, DATABASE() AS ping_db;');
+    await writeMysqlHeartbeat(conn);
     const responseTimeMs = Date.now() - pingStart;
 
-    const row = rows && rows[0] ? rows[0] : {};
     return {
       index: config.index,
       target: config.label,
       configured: true,
       status: 'SUCCESS',
-      database: row.ping_db || config.dbName,
+      database: config.dbName,
       responseTime: responseTimeMs,
+      operation: 'HEARTBEAT_WRITE',
       timestamp: new Date().toISOString(),
     };
   } catch (err) {
@@ -207,7 +230,7 @@ async function pingMysql(index = 1) {
 }
 
 /**
- * Pings all configured MySQL instances in parallel.
+ * Writes heartbeats to all configured MySQL instances in parallel.
  */
 async function pingAllMysql() {
   const configs = getMysqlConfigs();
@@ -223,4 +246,5 @@ module.exports = {
   pingAllMysql,
   getSslConfig,
   resolveCaCertificate,
+  writeMysqlHeartbeat,
 };

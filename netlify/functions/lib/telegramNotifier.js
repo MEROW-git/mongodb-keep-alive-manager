@@ -124,7 +124,9 @@ async function notifyPingSuccess({
         lines.join('\n') +
         `\n\n📡 <b>Source:</b> <code>${source}</code>\n` +
         `⏰ <b>Timestamp:</b> <code>${timeStr}</code>\n\n` +
-        `🚀 <i>All scheduled databases pinged and active.</i>`;
+        (anyFailed
+          ? `⚠️ <i>Heartbeat cycle completed with one or more failed targets.</i>`
+          : `💾 <i>Bounded heartbeat writes completed for all scheduled databases.</i>`);
     } else {
       const dbIcon = getDatabaseIcon(target);
       notificationMessage =

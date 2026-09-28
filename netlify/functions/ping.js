@@ -42,7 +42,7 @@ exports.handler = async (event, context) => {
     const { db } = await connectToDatabase();
     const logsCol = db.collection('logs');
 
-    // Execute pings across all configured databases (up to 5 of each type)
+    // Persist heartbeats across all configured databases (up to 5 of each type)
     const [mongoResults, pgResults, mysqlResults] = await Promise.all([
       pingAllMongo(),
       pingAllPostgres(),
@@ -53,7 +53,7 @@ exports.handler = async (event, context) => {
 
     for (const res of allPingRuns) {
       await logsCol.insertOne({
-        action: 'PING',
+        action: 'HEARTBEAT',
         target: res.target,
         status: res.status,
         database: res.database,
@@ -67,10 +67,10 @@ exports.handler = async (event, context) => {
     }
 
     // Broadcast keep-alive notification to approved Telegram subscribers
-    notifyPingSuccess({
+    await notifyPingSuccess({
       results: pingResults,
       source: isNetlifyScheduled ? 'SCHEDULED_CRON' : 'DASHBOARD_PULSE',
-    }).catch((e) => console.error('Auto notification error:', e.message));
+    });
 
     const nowIso = new Date().toISOString();
     const anyFailed = pingResults.some((r) => r.status === 'FAILED');

@@ -19,5 +19,5 @@
   status = 200
 
 [functions."scheduled-ping"]
-  # Netlify Scheduled Function schedule syntax
-  schedule = "*/5 * * * *"
+  # Wake every minute; the function reads the configured interval before writing.
+  schedule = "* * * * *"

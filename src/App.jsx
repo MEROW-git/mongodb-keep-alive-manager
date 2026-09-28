@@ -63,39 +63,20 @@ export default function App() {
     return () => clearInterval(interval);
   }, [token, loadDashboard]);
 
-  // Keep-alive automation runner while browser is open (in addition to Netlify scheduled functions)
-  useEffect(() => {
-    if (!token || !dashboardData?.automation?.enabled) return;
-    const intervalMinutes = dashboardData.automation.interval || 5;
-    const intervalMs = intervalMinutes * 60 * 1000;
-
-    const autoPingTimer = setInterval(async () => {
-      try {
-        console.log('Automated Keep-Alive Ping executing...');
-        await api.triggerPing();
-        loadDashboard(true);
-      } catch (e) {
-        console.warn('Auto ping execution error:', e);
-      }
-    }, intervalMs);
-
-    return () => clearInterval(autoPingTimer);
-  }, [token, dashboardData?.automation?.enabled, dashboardData?.automation?.interval, loadDashboard]);
-
-  // Trigger Ping (both automated from countdown & manual button)
+  // Trigger an immediate manual heartbeat from the dashboard or navbar.
   const handleTriggerPing = async () => {
     setIsPinging(true);
     try {
       const res = await api.triggerPing();
       showNotification({
-        title: 'Ping Successful',
-        message: `Atlas Keep-Alive executed (${res.responseTime}) • Database active`,
+        title: 'Heartbeat Written',
+        message: `Keep-alive writes completed (${res.responseTime}) • Databases active`,
         type: 'success',
       });
       await loadDashboard(true);
     } catch (err) {
       showNotification({
-        title: 'Ping Failed',
+        title: 'Heartbeat Failed',
         message: err.message || 'Database connection error.',
         type: 'error',
       });
@@ -219,8 +200,6 @@ export default function App() {
               dashboardData={dashboardData}
               isLoading={isLoading}
               onRefresh={() => loadDashboard()}
-              onTriggerPing={handleTriggerPing}
-              isPinging={isPinging}
               onToggleAutomation={handleToggleAutomation}
             />
           )}

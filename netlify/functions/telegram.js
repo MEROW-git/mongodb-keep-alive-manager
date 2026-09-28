@@ -352,7 +352,7 @@ async function processTelegramMessage(db, message) {
     const allRuns = [...mongoResults, ...pgResults, ...mysqlResults];
     for (const res of allRuns) {
       await logsCol.insertOne({
-        action: 'PING',
+        action: 'HEARTBEAT',
         target: res.target,
         status: res.status,
         database: res.database,

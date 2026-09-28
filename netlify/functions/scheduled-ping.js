@@ -4,9 +4,25 @@ const { pingAllPostgres } = require('./lib/postgres');
 const { pingAllMysql } = require('./lib/mysql');
 const { notifyPingSuccess } = require('./lib/telegramNotifier');
 
+function getScheduleDecision(settings, latestLog, nowMs = Date.now()) {
+  const parsedInterval = Number(settings?.interval);
+  const intervalMinutes = Number.isFinite(parsedInterval) && parsedInterval > 0
+    ? Math.min(1440, Math.max(1, Math.floor(parsedInterval)))
+    : 5;
+  const intervalMs = intervalMinutes * 60 * 1000;
+  const lastRunMs = latestLog?.createdAt ? new Date(latestLog.createdAt).getTime() : 0;
+  const elapsedMs = lastRunMs > 0 ? nowMs - lastRunMs : Number.POSITIVE_INFINITY;
+
+  return {
+    due: elapsedMs >= intervalMs,
+    intervalMinutes,
+    nextRunAt: lastRunMs > 0 ? new Date(lastRunMs + intervalMs).toISOString() : null,
+  };
+}
+
 /**
  * Netlify Scheduled Function / Local Cron Handler:
- * pings all configured databases (up to 5 of each: MongoDB, PostgreSQL, MySQL) to keep them active.
+ * writes to all configured databases (up to 5 of each: MongoDB, PostgreSQL, MySQL) to keep them active.
  */
 const scheduledPingHandler = async (event = {}, context = {}) => {
   console.log('⚡ Keep-Alive scheduled ping handler triggered...');
@@ -49,7 +65,24 @@ const scheduledPingHandler = async (event = {}, context = {}) => {
       };
     }
 
-    // 2. Ping all configured databases
+    // Netlify wakes this function every minute. The saved setting controls
+    // whether this invocation is due, so intervals can change without a deploy.
+    const latestLog = await logsCol.findOne({}, { sort: { createdAt: -1 } });
+    const scheduleDecision = getScheduleDecision(settings, latestLog);
+    if (!scheduleDecision.due) {
+      console.log(`⏭️ Next heartbeat is not due yet (interval: ${scheduleDecision.intervalMinutes}m).`);
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          status: 'skipped',
+          reason: 'Configured interval has not elapsed',
+          intervalMinutes: scheduleDecision.intervalMinutes,
+          nextRunAt: scheduleDecision.nextRunAt,
+        }),
+      };
+    }
+
+    // 2. Write a heartbeat to every configured database
     const [mongoResults, pgResults, mysqlResults] = await Promise.all([
       pingAllMongo(),
       pingAllPostgres(),
@@ -60,7 +93,7 @@ const scheduledPingHandler = async (event = {}, context = {}) => {
 
     for (const res of allPingRuns) {
       await logsCol.insertOne({
-        action: 'PING',
+        action: 'HEARTBEAT',
         target: res.target,
         status: res.status,
         database: res.database,
@@ -71,14 +104,14 @@ const scheduledPingHandler = async (event = {}, context = {}) => {
       });
 
       pingResults.push(res);
-      console.log(`${res.status === 'SUCCESS' ? '✅' : '❌'} ${res.target} (${res.database}) Ping: ${res.responseTime}ms [${res.status}]`);
+      console.log(`${res.status === 'SUCCESS' ? '✅' : '❌'} ${res.target} (${res.database}) Heartbeat: ${res.responseTime}ms [${res.status}]`);
     }
 
     // 3. Send Telegram notification to subscribers
-    notifyPingSuccess({
+    await notifyPingSuccess({
       results: pingResults,
       source: 'SCHEDULED_CRON',
-    }).catch((e) => console.error('Telegram notification error:', e.message));
+    });
 
     return {
       statusCode: 200,
@@ -89,7 +122,7 @@ const scheduledPingHandler = async (event = {}, context = {}) => {
       }),
     };
   } catch (error) {
-    console.error('❌ Keep-Alive Ping Handler Critical Error:', error.message);
+    console.error('❌ Keep-Alive Heartbeat Handler Critical Error:', error.message);
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -100,6 +133,7 @@ const scheduledPingHandler = async (event = {}, context = {}) => {
   }
 };
 
-// Schedule every 5 minutes (standard Netlify cron expression)
-exports.handler = schedule('*/5 * * * *', scheduledPingHandler);
+// Wake every minute; getScheduleDecision enforces the administrator's interval.
+exports.handler = schedule('* * * * *', scheduledPingHandler);
 exports.scheduledPingHandler = scheduledPingHandler;
+exports.getScheduleDecision = getScheduleDecision;

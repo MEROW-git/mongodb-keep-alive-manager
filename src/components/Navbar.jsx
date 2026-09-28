@@ -59,7 +59,7 @@ export default function Navbar({ onPingTriggered, isPinging, dbStatus = 'ONLINE'
             </span>
           </div>
 
-          {/* Quick Ping Now Button */}
+          {/* Manual heartbeat button */}
           <button
             id="navbar-ping-btn"
             onClick={onPingTriggered}
@@ -67,7 +67,7 @@ export default function Navbar({ onPingTriggered, isPinging, dbStatus = 'ONLINE'
             className="flex items-center space-x-1.5 sm:space-x-2 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium rounded-lg bg-mongo text-black hover:bg-mongo-400 active:scale-95 transition-all shadow-[0_0_20px_rgba(0,237,100,0.25)] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
           >
             <Zap className={`w-3.5 h-3.5 sm:w-4 sm:h-4 fill-black ${isPinging ? 'animate-spin' : ''}`} />
-            <span>{isPinging ? 'Pinging...' : 'Ping Now'}</span>
+            <span>{isPinging ? 'Writing...' : 'Heartbeat Now'}</span>
           </button>
 
           {/* User Profile Pill */}

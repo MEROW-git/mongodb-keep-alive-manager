@@ -5,6 +5,32 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../../.env'), overr
 // Connection pool cache by instance index (1..5)
 const cachedClients = new Map();
 const cachedDbs = new Map();
+const HEARTBEAT_COLLECTION = 'keepalive_heartbeat';
+const HEARTBEAT_DOCUMENT_ID = 'database_keepalive';
+
+/**
+ * Persist one bounded heartbeat document in the target database. Updating a
+ * singleton exercises a real database write without creating unbounded rows.
+ */
+async function writeMongoHeartbeat(db, now = new Date()) {
+  const result = await db.collection(HEARTBEAT_COLLECTION).updateOne(
+    { _id: HEARTBEAT_DOCUMENT_ID },
+    {
+      $set: {
+        lastHeartbeatAt: now,
+        service: 'mongodb-keep-alive-manager',
+      },
+    },
+    { upsert: true },
+  );
+
+  return {
+    acknowledged: result.acknowledged !== false,
+    matchedCount: result.matchedCount || 0,
+    modifiedCount: result.modifiedCount || 0,
+    upsertedCount: result.upsertedCount || 0,
+  };
+}
 
 /**
  * Returns configuration objects for all configured MongoDB instances (up to 5).
@@ -118,7 +144,7 @@ async function connectToDatabase() {
 }
 
 /**
- * Pings a specific MongoDB instance and measures pure round-trip command latency.
+ * Writes a heartbeat to a specific MongoDB instance and measures latency.
  */
 async function pingMongoInstance(index = 1) {
   const configs = getMongoConfigs();
@@ -153,7 +179,7 @@ async function pingMongoInstance(index = 1) {
 
   const pingStart = Date.now();
   try {
-    const pingResult = await dbInstance.command({ ping: 1 });
+    const heartbeatResult = await writeMongoHeartbeat(dbInstance);
     const latency = Date.now() - pingStart;
 
     return {
@@ -163,12 +189,13 @@ async function pingMongoInstance(index = 1) {
       status: 'SUCCESS',
       database: config.dbName,
       responseTime: latency,
-      pingResult,
+      operation: 'HEARTBEAT_WRITE',
+      heartbeatResult,
       timestamp: new Date().toISOString(),
     };
   } catch (err) {
     const latency = Date.now() - pingStart;
-    console.error('MongoDB [' + config.label + '] Ping operation failed:', err.message);
+    console.error('MongoDB [' + config.label + '] heartbeat write failed:', err.message);
     cachedClients.delete(index);
     cachedDbs.delete(index);
     return {
@@ -185,7 +212,7 @@ async function pingMongoInstance(index = 1) {
 }
 
 /**
- * Pings all configured MongoDB instances in parallel.
+ * Writes heartbeats to all configured MongoDB instances in parallel.
  */
 async function pingAllMongo() {
   const configs = getMongoConfigs();
@@ -200,4 +227,5 @@ module.exports = {
   isMongoConfigured,
   pingMongoInstance,
   pingAllMongo,
+  writeMongoHeartbeat,
 };

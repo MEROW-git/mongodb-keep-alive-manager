@@ -5,6 +5,31 @@ const path = require('path');
 // Pool cache per instance index (1..5)
 const cachedPools = new Map();
 
+/**
+ * Persist one bounded heartbeat row in the target database. The upsert keeps
+ * the table at one row while still producing real write activity.
+ */
+async function writePostgresHeartbeat(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS keepalive_heartbeat (
+      id SMALLINT PRIMARY KEY CHECK (id = 1),
+      last_heartbeat_at TIMESTAMPTZ NOT NULL,
+      service VARCHAR(64) NOT NULL
+    );
+  `);
+
+  const result = await client.query(`
+    INSERT INTO keepalive_heartbeat (id, last_heartbeat_at, service)
+    VALUES (1, CURRENT_TIMESTAMP, 'mongodb-keep-alive-manager')
+    ON CONFLICT (id) DO UPDATE SET
+      last_heartbeat_at = EXCLUDED.last_heartbeat_at,
+      service = EXCLUDED.service
+    RETURNING last_heartbeat_at;
+  `);
+
+  return result.rows && result.rows[0] ? result.rows[0] : null;
+}
+
 function resolveCaCertificate(index = 1) {
   const rootDir = path.resolve(__dirname, '../../../');
   const caPath = index === 1
@@ -150,7 +175,7 @@ function getPostgresPool(index = 1) {
 }
 
 /**
- * Executes a lightweight ping query against a PostgreSQL instance (default index 1).
+ * Writes a heartbeat to a PostgreSQL instance (default index 1).
  */
 async function pingPostgres(index = 1) {
   const configs = getPostgresConfigs();
@@ -178,17 +203,17 @@ async function pingPostgres(index = 1) {
   try {
     client = await pool.connect();
     const pingStart = Date.now();
-    const result = await client.query('/* keepalive */ SELECT 1 as alive, current_database() as current_db;');
+    await writePostgresHeartbeat(client);
     const responseTimeMs = Date.now() - pingStart;
 
-    const row = result.rows && result.rows[0] ? result.rows[0] : {};
     return {
       index: config.index,
       target: config.label,
       configured: true,
       status: 'SUCCESS',
-      database: row.current_db || config.dbName,
+      database: config.dbName,
       responseTime: responseTimeMs,
+      operation: 'HEARTBEAT_WRITE',
       timestamp: new Date().toISOString(),
     };
   } catch (err) {
@@ -211,7 +236,7 @@ async function pingPostgres(index = 1) {
 }
 
 /**
- * Pings all configured PostgreSQL instances in parallel.
+ * Writes heartbeats to all configured PostgreSQL instances in parallel.
  */
 async function pingAllPostgres() {
   const configs = getPostgresConfigs();
@@ -227,4 +252,5 @@ module.exports = {
   pingAllPostgres,
   getSslConfig,
   resolveCaCertificate,
+  writePostgresHeartbeat,
 };

@@ -31,8 +31,6 @@ export default function Dashboard({
   dashboardData,
   isLoading,
   onRefresh,
-  onTriggerPing,
-  isPinging,
   onToggleAutomation,
 }) {
   const stats = dashboardData?.stats || {};
@@ -181,17 +179,11 @@ export default function Dashboard({
         setCountdownText('Syncing...');
         if (progressBarRef.current) progressBarRef.current.style.width = '0%';
 
-        if (!isAutoPingingRef.current) {
+        if (!isAutoPingingRef.current && onRefresh) {
           isAutoPingingRef.current = true;
-          if (diffMs < -15000 && onTriggerPing && !isPinging) {
-            onTriggerPing().finally(() => {
-              setTimeout(() => { isAutoPingingRef.current = false; }, 4000);
-            });
-          } else if (onRefresh) {
-            onRefresh().finally(() => {
-              setTimeout(() => { isAutoPingingRef.current = false; }, 4000);
-            });
-          }
+          onRefresh().finally(() => {
+            setTimeout(() => { isAutoPingingRef.current = false; }, 4000);
+          });
         }
       } else {
         isAutoPingingRef.current = false;
@@ -214,7 +206,7 @@ export default function Dashboard({
 
     animId = requestAnimationFrame(renderFrame);
     return () => cancelAnimationFrame(animId);
-  }, [stats.lastPingFull, automation.enabled, automation.interval, onTriggerPing, isPinging]);
+  }, [stats.lastPingFull, automation.enabled, automation.interval, onRefresh]);
 
   return (
     <div className="space-y-6">

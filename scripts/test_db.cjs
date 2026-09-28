@@ -6,7 +6,7 @@ const { getMysqlConfigs, pingMysql, pingAllMysql } = require('../netlify/functio
 
 async function testAllDatabases() {
   console.log('========================================================');
-  console.log('🚀 Multi-Database Keep-Alive Connection & Ping Diagnostic');
+  console.log('🚀 Multi-Database Keep-Alive Heartbeat Diagnostic');
   console.log('========================================================\n');
 
   // 1. MongoDB
@@ -19,9 +19,9 @@ async function testAllDatabases() {
       console.log('   👉 [' + cfg.label + '] Target DB: ' + cfg.dbName + ' (Primary Storage: ' + (cfg.isPrimary ? 'YES' : 'NO') + ')');
       const res = await pingMongoInstance(cfg.index);
       if (res.status === 'SUCCESS') {
-        console.log('      ✅ Connected & Pinged in ' + res.responseTime + 'ms! Status: ONLINE');
+        console.log('      ✅ Connected & heartbeat written in ' + res.responseTime + 'ms! Status: ONLINE');
       } else {
-        console.log('      ❌ Ping FAILED (' + res.responseTime + 'ms): ' + (res.error || res.message));
+        console.log('      ❌ Heartbeat FAILED (' + res.responseTime + 'ms): ' + (res.error || res.message));
       }
     }
   }
@@ -37,9 +37,9 @@ async function testAllDatabases() {
       console.log('   👉 [' + cfg.label + '] Target DB: ' + cfg.dbName);
       const res = await pingPostgres(cfg.index);
       if (res.status === 'SUCCESS') {
-        console.log('      ✅ Connected & Pinged in ' + res.responseTime + 'ms! Database: ' + res.database + ' (Server Time: ' + res.timestamp + ')');
+        console.log('      ✅ Connected & heartbeat written in ' + res.responseTime + 'ms! Database: ' + res.database + ' (Server Time: ' + res.timestamp + ')');
       } else {
-        console.log('      ❌ Ping FAILED (' + res.responseTime + 'ms): ' + (res.error || res.message));
+        console.log('      ❌ Heartbeat FAILED (' + res.responseTime + 'ms): ' + (res.error || res.message));
       }
     }
   }
@@ -55,9 +55,9 @@ async function testAllDatabases() {
       console.log('   👉 [' + cfg.label + '] Target DB: ' + cfg.dbName);
       const res = await pingMysql(cfg.index);
       if (res.status === 'SUCCESS') {
-        console.log('      ✅ Connected & Pinged in ' + res.responseTime + 'ms! Database: ' + res.database + ' (Server Time: ' + res.timestamp + ')');
+        console.log('      ✅ Connected & heartbeat written in ' + res.responseTime + 'ms! Database: ' + res.database + ' (Server Time: ' + res.timestamp + ')');
       } else {
-        console.log('      ❌ Ping FAILED (' + res.responseTime + 'ms): ' + (res.error || res.message));
+        console.log('      ❌ Heartbeat FAILED (' + res.responseTime + 'ms): ' + (res.error || res.message));
       }
     }
   }

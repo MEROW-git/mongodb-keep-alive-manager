@@ -130,10 +130,10 @@ export default function Settings({ onSettingsUpdated }) {
           {/* Interval Selector */}
           <div className="p-4 rounded-xl bg-gray-900/80 border border-gray-800 space-y-3">
             <label className="block text-sm font-semibold text-white">
-              Ping Interval
+              Heartbeat Interval
             </label>
             <p className="text-xs text-gray-400">
-              Select the frequency interval between automated database ping operations.
+              Select the frequency interval between automated database heartbeat writes.
             </p>
 
             <select
@@ -272,7 +272,7 @@ export default function Settings({ onSettingsUpdated }) {
             <h2 className="text-sm font-semibold text-white">Cron & Webhook Keep-Alive Trigger</h2>
           </div>
           <p className="text-xs text-gray-400 leading-relaxed">
-            Automated keep-alive pings run internally every 5 minutes. You can also trigger keep-alive cycles from external monitoring services (such as UptimeRobot, cron-job.org, or curl) using the secure header-authenticated endpoint:
+            Netlify checks for due work every minute and writes a bounded heartbeat record at the interval selected above. You can also trigger a heartbeat cycle from external monitoring services (such as UptimeRobot, cron-job.org, or curl) using the secure header-authenticated endpoint:
           </p>
           <div className="p-3.5 rounded-xl bg-gray-950 border border-gray-800 space-y-2 font-mono text-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-gray-300">
